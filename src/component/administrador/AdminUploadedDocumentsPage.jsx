@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../../firebaseconfig';
 import { collection, getDocs, query, where, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { useSelectedCompany } from '../../contexts/selected-company-context';
+import { useCompany } from '../../contexts/company-context';
 import {
   Box,
   Typography,
@@ -165,7 +165,7 @@ export default function AdminUploadedDocumentsPage() {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuDocId, setMenuDocId] = useState(null);
   
-  const { selectedCompanyId } = useSelectedCompany();
+  const { selectedCompanyId } = useCompany();
 
   useEffect(() => {
     let isMounted = true;

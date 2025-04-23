@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
-import { useSelectedCompany } from "../../contexts/selected-company-context";
+import { useCompany } from "../../contexts/company-context";
 import {
   Box,
   Typography,
@@ -52,7 +52,7 @@ export default function AdminRequiredDocumentsPage() {
     documentId: null
   });
 
-  const { selectedCompanyId } = useSelectedCompany();
+  const { selectedCompanyId } = useCompany();
   const theme = useTheme();
 
   useEffect(() => {

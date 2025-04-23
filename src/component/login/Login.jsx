@@ -50,8 +50,11 @@ const Login = () => {
           const userData = userDocSnap.data();
 
           if (userData.role === ADMIN_ROLE || userData.role?.includes(ADMIN_ROLE) || user.email === "fe.rv@hotmail.com") {
+            // Guardar explícitamente que es una sesión de administrador
             localStorage.setItem("isAdminSession", "true");
+            // Forzar recarga para asegurar que el contexto de autenticación se actualice
             navigate("/admin/dashboard");
+            window.location.reload();
           } else {
             setError("No tienes permisos de administrador");
           }

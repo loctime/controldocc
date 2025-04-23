@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseconfig';
 import { collection, getDocs } from 'firebase/firestore';
-import { useSelectedCompany } from '../../contexts/selected-company-context';
+import { useCompany } from '../../contexts/company-context';
 import {
   Box,
   FormControl,
@@ -19,7 +19,7 @@ const AdminCompanySelector = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { selectedCompanyId, selectCompany } = useSelectedCompany();
+  const { selectedCompanyId, selectCompany } = useCompany();
 
   useEffect(() => {
     const fetchCompanies = async () => {

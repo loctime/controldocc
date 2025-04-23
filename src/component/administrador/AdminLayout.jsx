@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useSelectedCompany } from "../../contexts/selected-company-context";
+import { useCompany } from "../../contexts/company-context";
 import { db, auth } from "../../firebaseconfig";
 import { collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -102,7 +102,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const [companies, setCompanies] = useState([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const { selectedCompanyId, selectCompany } = useSelectedCompany();
+  const { selectedCompanyId, selectCompany } = useCompany();
 
   const handleDrawerOpen = () => {
     setOpen(true);

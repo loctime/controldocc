@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SelectedCompanyProvider } from '../../contexts/selected-company-context';
+import { CompanyProvider } from '../../contexts/company-context';
 import AdminCompanySelector from './AdminCompanySelector';
 import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
@@ -37,7 +37,7 @@ export default function AdminPage() {
   };
 
   return (
-    <SelectedCompanyProvider>
+    <CompanyProvider>
       <Box sx={{ p: 3 }}>
         <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
           <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -90,6 +90,6 @@ export default function AdminPage() {
           </Typography>
         </TabPanel>
       </Box>
-    </SelectedCompanyProvider>
+    </CompanyProvider>
   );
 }
