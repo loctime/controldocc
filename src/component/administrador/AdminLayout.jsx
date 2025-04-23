@@ -161,7 +161,11 @@ export default function AdminLayout() {
 
   // Manejar el cambio de empresa seleccionada
   const handleCompanyChange = (event) => {
-    setSelectedCompanyId(event.target.value);
+    const companyId = event.target.value;
+    // Buscar el nombre de la empresa seleccionada
+    const selectedCompany = companies.find(company => company.id === companyId);
+    // Usar la función selectCompany del contexto para actualizar tanto el ID como el nombre
+    selectCompany(companyId, selectedCompany ? selectedCompany.name : "");
   };
 
   // Menú items para la navegación
@@ -169,7 +173,13 @@ export default function AdminLayout() {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'Empresas', icon: <BusinessIcon />, path: '/admin/companies' },
     { text: 'Documentos Requeridos', icon: <DescriptionIcon />, path: '/admin/required-documents' },
-    { text: 'Documentos Subidos', icon: <UploadIcon />, path: '/admin/uploaded-documents' },
+    // Destacamos la opción de Documentos Subidos para hacerla más visible
+    { 
+      text: 'Documentos Subidos', 
+      icon: <UploadIcon color="secondary" />, 
+      path: '/admin/uploaded-documents',
+      highlight: true // Marcamos esta opción para destacarla
+    },
   ];
 
   return (
@@ -334,10 +344,17 @@ export default function AdminLayout() {
                   component={Link} 
                   to={item.path}
                   sx={{
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 
+                                   item.highlight ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
                     '&:hover': {
                       backgroundColor: 'rgba(255, 255, 255, 0.2)',
                     },
+                    // Si es la opción destacada, agregamos un borde para hacerla más visible
+                    ...(item.highlight && {
+                      borderLeft: '4px solid',
+                      borderColor: theme.palette.secondary.main,
+                      paddingLeft: '12px'
+                    })
                   }}
                 >
                   <ListItemIcon sx={{ color: '#fff' }}>

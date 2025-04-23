@@ -177,7 +177,7 @@ export default function AdminRequiredDocumentsPage() {
             fullWidth
             disabled={loading || !selectedCompanyId}
           />
-          <FormControl sx={{ minWidth: 150 }}>
+          <FormControl sx={{ minWidth: 200 }}>
             <InputLabel>Aplicable a</InputLabel>
             <Select
               value={entityType}
@@ -185,10 +185,17 @@ export default function AdminRequiredDocumentsPage() {
               label="Aplicable a"
               disabled={loading || !selectedCompanyId}
             >
-              <MenuItem value="company">Empresa</MenuItem>
-              <MenuItem value="employee">Empleado</MenuItem>
-              <MenuItem value="vehicle">Vehículo</MenuItem>
+              <MenuItem value="company">Empresa (documento único)</MenuItem>
+              <MenuItem value="employee">Empleado (uno por cada persona)</MenuItem>
+              <MenuItem value="vehicle">Vehículo (uno por cada vehículo)</MenuItem>
             </Select>
+            <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'text.secondary' }}>
+              {entityType === 'employee' ? 
+                'Este documento deberá ser subido para cada empleado registrado por la empresa.' :
+              entityType === 'vehicle' ? 
+                'Este documento deberá ser subido para cada vehículo registrado por la empresa.' :
+                'Este documento se aplica a la empresa en general.'}
+            </Typography>
           </FormControl>
           <FormControl sx={{ minWidth: 150 }}>
             <InputLabel>Tipo de vencimiento</InputLabel>

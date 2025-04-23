@@ -30,6 +30,11 @@ const PersonalForm = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  
+  // Obtener información de la empresa desde localStorage (como backup)
+  const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
+  // Usar companyId del contexto de autenticación o del localStorage como respaldo
+  const companyId = user?.companyId || userCompanyData?.companyId;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,6 +48,13 @@ const PersonalForm = () => {
     setError("");
 
     try {
+      // Verificar que exista un companyId válido
+      if (!companyId) {
+        setError("Error: No se pudo identificar la empresa. Por favor, cierre sesión y vuelva a ingresar.");
+        setLoading(false);
+        return;
+      }
+
       const nuevoPersonal = {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
@@ -50,10 +62,11 @@ const PersonalForm = () => {
         cargo: cargo.trim(),
         telefono: telefono.trim(),
         email: email.trim(),
-        companyId: user.companyId,
+        companyId: companyId,
         createdAt: serverTimestamp(),
       };
 
+      console.log("Guardando personal con companyId:", companyId);
       await addDoc(collection(db, "personal"), nuevoPersonal);
       
       // Limpiar formulario
@@ -162,26 +175,35 @@ const PersonalForm = () => {
             <Button
               type="submit"
               variant="contained"
-              startIcon={<PersonAddIcon />}
               disabled={loading}
               sx={{ mt: 2 }}
             >
-              {loading ? <CircularProgress size={24} /> : "Agregar Personal"}
+              {loading ? (
+                <CircularProgress size={24} />
+              ) : (
+                <>
+                  <PersonAddIcon style={{ marginRight: '8px' }} />
+                  Agregar Personal
+                </>
+              )}
             </Button>
           </Grid>
         </Grid>
       </Box>
       
-      <Snackbar
-        open={success}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity="success">
-          Personal agregado exitosamente
-        </Alert>
-      </Snackbar>
+      {/* Usar un enfoque condicional para el Snackbar para evitar problemas de montaje/desmontaje */}
+      {success && (
+        <Snackbar
+          open={true}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity="success">
+            Personal agregado exitosamente
+          </Alert>
+        </Snackbar>
+      )}
     </Paper>
   );
 };

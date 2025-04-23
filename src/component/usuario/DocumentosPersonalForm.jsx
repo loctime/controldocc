@@ -55,11 +55,11 @@ const DocumentosPersonalForm = ({ persona }) => {
     const fetchRequiredDocuments = async () => {
       setLoading(true);
       try {
-        // Obtener documentos requeridos para esta empresa que sean específicamente para personal
+        // Obtener documentos requeridos para esta empresa que sean específicamente para empleados
         const docsQuery = query(
           collection(db, "requiredDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Personal")
+          where("entityType", "==", "employee")
         );
         
         const docsSnapshot = await getDocs(docsQuery);
@@ -74,7 +74,7 @@ const DocumentosPersonalForm = ({ persona }) => {
         const uploadedDocsQuery = query(
           collection(db, "uploadedDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Personal"),
+          where("entityType", "==", "employee"),
           where("entityId", "==", persona.id)
         );
         
@@ -253,9 +253,14 @@ const DocumentosPersonalForm = ({ persona }) => {
           Documentos de {persona.nombre} {persona.apellido}
         </Typography>
         
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Cada empleado debe tener todos los documentos requeridos subidos individualmente. 
+          Los documentos marcados como pendientes deben ser subidos para este empleado.
+        </Alert>
+        
         {requiredDocuments.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            No hay documentos requeridos para el personal.
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            No hay documentos requeridos para los empleados. El administrador debe configurar los documentos requeridos.
           </Alert>
         ) : (
           <>
@@ -296,12 +301,23 @@ const DocumentosPersonalForm = ({ persona }) => {
                           {isDocumentUploaded(doc.id) ? (
                             getDocumentStatusIcon(doc.id)
                           ) : (
-                            <DescriptionIcon color="primary" />
+                            <DescriptionIcon color="error" />
                           )}
                         </ListItemIcon>
                         <ListItemText 
-                          primary={doc.name} 
-                          secondary={getDocumentStatusText(doc.id)}
+                          primary={<>
+                            <Typography component="span" variant="subtitle1">
+                              {doc.documentName}
+                            </Typography>
+                            {!isDocumentUploaded(doc.id) && (
+                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'error.main', fontWeight: 'bold' }}>
+                                (REQUERIDO)
+                              </Typography>
+                            )}
+                          </>} 
+                          secondary={isDocumentUploaded(doc.id) 
+                            ? getDocumentStatusText(doc.id) 
+                            : "Pendiente - Este documento debe ser subido para este empleado"}
                         />
                       </ListItem>
                     ))}

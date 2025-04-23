@@ -55,7 +55,7 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
         const docsQuery = query(
           collection(db, "requiredDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Vehículo")
+          where("entityType", "==", "vehicle")
         );
         
         const docsSnapshot = await getDocs(docsQuery);
@@ -70,7 +70,7 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
         const uploadedDocsQuery = query(
           collection(db, "uploadedDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Vehículo"),
+          where("entityType", "==", "vehicle"),
           where("entityId", "==", vehiculo.id)
         );
         
@@ -249,9 +249,14 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
           Documentos de {vehiculo.marca} {vehiculo.modelo} ({vehiculo.patente})
         </Typography>
         
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Cada vehículo debe tener todos los documentos requeridos subidos individualmente. 
+          Los documentos marcados como pendientes deben ser subidos para este vehículo.
+        </Alert>
+        
         {requiredDocuments.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            No hay documentos requeridos para los vehículos.
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            No hay documentos requeridos para los vehículos. El administrador debe configurar los documentos requeridos.
           </Alert>
         ) : (
           <>
@@ -292,12 +297,23 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
                           {isDocumentUploaded(doc.id) ? (
                             getDocumentStatusIcon(doc.id)
                           ) : (
-                            <DescriptionIcon color="primary" />
+                            <DescriptionIcon color="error" />
                           )}
                         </ListItemIcon>
                         <ListItemText 
-                          primary={doc.name} 
-                          secondary={getDocumentStatusText(doc.id)}
+                          primary={<>
+                            <Typography component="span" variant="subtitle1">
+                              {doc.documentName}
+                            </Typography>
+                            {!isDocumentUploaded(doc.id) && (
+                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'error.main', fontWeight: 'bold' }}>
+                                (REQUERIDO)
+                              </Typography>
+                            )}
+                          </>} 
+                          secondary={isDocumentUploaded(doc.id) 
+                            ? getDocumentStatusText(doc.id) 
+                            : "Pendiente - Este documento debe ser subido para este vehículo"}
                         />
                       </ListItem>
                     ))}

@@ -83,6 +83,10 @@ const DocumentItem = React.memo(({ document, onView, onApprove, onReject, onOpen
             </Typography>
             <br />
             <Typography variant="body2" component="span">
+              Empresa: <strong>{document.companyName}</strong>
+            </Typography>
+            <br />
+            <Typography variant="body2" component="span">
               Subido: {document.uploadedAt ? new Date(document.uploadedAt.seconds * 1000).toLocaleString() : 'Fecha desconocida'}
             </Typography>
             {document.reviewedAt && (
@@ -171,33 +175,42 @@ export default function AdminUploadedDocumentsPage() {
     let isMounted = true;
     
     const fetchDocuments = async () => {
-      if (!selectedCompanyId) {
-        if (isMounted) {
-          setDocuments([]);
-          setFilteredDocuments([]);
-          setLoading(false);
-        }
-        return;
-      }
-      
       if (isMounted) setLoading(true);
       
       try {
-        console.log('Buscando documentos para la empresa:', selectedCompanyId);
-        const q = query(
-          collection(db, 'uploadedDocuments'),
-          where('companyId', '==', selectedCompanyId)
-        );
-        const snapshot = await getDocs(q);
+        let snapshot;
+        
+        if (selectedCompanyId) {
+          // Si hay una empresa seleccionada, mostrar solo sus documentos
+          console.log('Buscando documentos para la empresa:', selectedCompanyId);
+          const q = query(
+            collection(db, 'uploadedDocuments'),
+            where('companyId', '==', selectedCompanyId)
+          );
+          snapshot = await getDocs(q);
+        } else {
+          // Si no hay empresa seleccionada, mostrar todos los documentos
+          console.log('Buscando documentos de todas las empresas');
+          const q = collection(db, 'uploadedDocuments');
+          snapshot = await getDocs(q);
+        }
         
         if (!isMounted) return;
         
+        // Obtener información de las empresas para mostrar nombres en lugar de IDs
+        const companiesSnapshot = await getDocs(collection(db, 'companies'));
+        const companiesMap = {};
+        companiesSnapshot.forEach(doc => {
+          companiesMap[doc.id] = doc.data().name;
+        });
+        
         const list = snapshot.docs.map(doc => {
           const data = doc.data();
-          console.log('Documento encontrado:', data);
           return { 
             id: doc.id, 
             ...data,
+            // Agregar el nombre de la empresa si está disponible
+            companyName: companiesMap[data.companyId] || data.companyId,
             key: `doc-${doc.id}`
           };
         });
