@@ -234,7 +234,7 @@ function StatCard({ title, value, icon, color }) {
             justifyContent: 'center',
             alignItems: 'center'
           }}>
-            {React.cloneElement(icon, { sx: { color } })}
+            {React.cloneElement(icon, { sx: { color }, key: `icon-${title}` })}
           </Box>
           <Typography variant="h6" component="div">
             {title}

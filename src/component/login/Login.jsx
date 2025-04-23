@@ -78,6 +78,7 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Primero verificamos que la empresa exista
       const companyRef = doc(db, "companies", cuit.trim());
       const companySnap = await getDoc(companyRef);
 
@@ -88,7 +89,8 @@ const Login = () => {
       }
 
       const companyData = companySnap.data();
-
+      
+      // Buscamos el usuario asociado a esta empresa
       const usersRef = collection(db, "users");
       const userQuery = query(usersRef, where("companyId", "==", cuit.trim()));
       const userSnapshot = await getDocs(userQuery);
@@ -99,11 +101,13 @@ const Login = () => {
         return;
       }
 
+      // Verificamos las credenciales
       let authenticated = false;
       let userData = null;
 
       for (const userDoc of userSnapshot.docs) {
         const user = userDoc.data();
+        // Verificamos la contraseña
         if (user.password === password) {
           authenticated = true;
           userData = user;
@@ -112,6 +116,7 @@ const Login = () => {
       }
 
       if (authenticated && userData) {
+        // Guardamos la información en localStorage para la sesión
         localStorage.setItem('userCompany', JSON.stringify({
           companyId: cuit.trim(),
           companyName: companyData.name,
@@ -119,11 +124,19 @@ const Login = () => {
           userRole: userData.role
         }));
 
+        console.log("Login exitoso como usuario empresa");
+        
+        // Redirigimos al dashboard de usuario y forzamos una recarga
+        // para asegurar que todas las rutas y estados se actualicen correctamente
         navigate("/usuario/dashboard");
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       } else {
         setError("Contraseña incorrecta");
       }
     } catch (err) {
+      console.error("Error en login de usuario:", err);
       setError("Error al iniciar sesión. Intenta de nuevo.");
     } finally {
       setLoading(false);

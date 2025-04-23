@@ -1,7 +1,6 @@
-// src/pages/admin/AdminCompaniesPage.jsx
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
-import { collection, getDocs, setDoc, deleteDoc, doc, addDoc, where, query } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, query, where, setDoc, addDoc } from "firebase/firestore";
 import {
   Box,
   Typography,
@@ -61,7 +60,7 @@ export default function AdminCompaniesPage() {
     setError("");
     try {
       const snapshot = await getDocs(collection(db, "companies"));
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setCompanies(list);
     } catch (error) {
       console.error("Error loading companies:", error);
@@ -97,7 +96,7 @@ export default function AdminCompaniesPage() {
         companyId: newCompanyCuit.trim(),
         name: newCompanyName.trim(),
         createdAt: new Date().toISOString(),
-        password: newCompanyPassword.trim(), // Almacenar la contraseña para referencia (en producción debería estar encriptada)
+        password: newCompanyPassword.trim(), // Almacenar la contraseña para referencia
       };
       
       // Crear un documento en la colección users con un ID generado automáticamente
@@ -117,43 +116,74 @@ export default function AdminCompaniesPage() {
     }
   };
 
+  // Función para abrir el diálogo de confirmación
   const openDeleteConfirmation = (company) => {
-    setCompanyToDelete(company);
+    // Guardamos una copia local de la empresa para evitar problemas de referencia
+    setCompanyToDelete({...company});
     setOpenDeleteDialog(true);
   };
 
+  // Función para cerrar el diálogo sin eliminar
+  const handleCloseDialog = () => {
+    setOpenDeleteDialog(false);
+    // Esperamos a que se complete la animación de cierre antes de limpiar el estado
+    setTimeout(() => {
+      setCompanyToDelete(null);
+    }, 300); // 300ms es aproximadamente la duración de la animación de Material UI
+  };
+
+  // Función para eliminar la empresa
   const handleDeleteCompany = async () => {
     if (!companyToDelete) return;
 
+    // Guardamos los datos necesarios en variables locales
+    const cuitToDelete = companyToDelete.cuit;
+    
+    // Cerramos el diálogo primero
     setOpenDeleteDialog(false);
-    setLoading(true);
-    setError("");
-    try {
-      // Eliminar la empresa usando el CUIT como ID
-      await deleteDoc(doc(db, "companies", companyToDelete.cuit));
-      
-      // También eliminar los usuarios asociados a esta empresa
-      const usersQuery = await getDocs(
-        query(collection(db, "users"), where("companyId", "==", companyToDelete.cuit))
-      );
-      
-      const deletePromises = [];
-      usersQuery.forEach((userDoc) => {
-        deletePromises.push(deleteDoc(doc(db, "users", userDoc.id)));
-      });
-      
-      if (deletePromises.length > 0) {
-        await Promise.all(deletePromises);
+    
+    // Esperamos a que se complete la animación de cierre
+    setTimeout(async () => {
+      try {
+        setLoading(true);
+        setError("");
+        
+        // Actualizamos el estado local primero (optimistic update)
+        setCompanies((prevCompanies) =>
+          prevCompanies.filter((company) => company.cuit !== cuitToDelete)
+        );
+        
+        // Eliminamos la empresa de Firestore
+        await deleteDoc(doc(db, "companies", cuitToDelete));
+        
+        // Buscamos y eliminamos los usuarios asociados
+        const usersQuery = await getDocs(
+          query(collection(db, "users"), where("companyId", "==", cuitToDelete))
+        );
+        
+        const deletePromises = [];
+        usersQuery.forEach((userDoc) => {
+          deletePromises.push(deleteDoc(doc(db, "users", userDoc.id)));
+        });
+        
+        if (deletePromises.length > 0) {
+          await Promise.all(deletePromises);
+        }
+        
+        // Limpiamos la referencia a la empresa eliminada
+        setCompanyToDelete(null);
+        
+        // Recargamos las empresas para asegurar sincronización
+        await loadCompanies();
+      } catch (error) {
+        console.error("Error deleting company:", error);
+        setError("Error al eliminar la empresa. Por favor, intenta de nuevo.");
+        // Recargamos las empresas para restaurar el estado correcto
+        await loadCompanies();
+      } finally {
+        setLoading(false);
       }
-      
-      setCompanyToDelete(null);
-      await loadCompanies();
-    } catch (error) {
-      console.error("Error deleting company:", error);
-      setError("Error al eliminar la empresa. Por favor, intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
+    }, 300); // Esperamos a que se complete la animación
   };
 
   return (
@@ -226,17 +256,13 @@ export default function AdminCompaniesPage() {
       </Paper>
 
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
           <CircularProgress />
         </Box>
-      ) : companies.length === 0 ? (
-        <Alert severity="info">
-          No hay empresas creadas. Crea tu primera empresa utilizando el formulario de arriba.
-        </Alert>
       ) : (
         <Grid container spacing={3}>
           {companies.map((company) => (
-            <Grid item xs={12} sm={6} md={4} key={company.id}>
+            <Grid item xs={12} md={4} key={company.id}>
               <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -272,24 +298,30 @@ export default function AdminCompaniesPage() {
 
       <Dialog
         open={openDeleteDialog}
-        onClose={() => setOpenDeleteDialog(false)}
         TransitionComponent={Transition}
         keepMounted
+        onClose={handleCloseDialog}
+        aria-labelledby="alert-dialog-slide-title"
+        aria-describedby="alert-dialog-slide-description"
       >
-        <DialogTitle>Confirmar eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            ¿Estás seguro de que deseas eliminar la empresa "{companyToDelete?.name}"? Esta acción no se puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDeleteDialog(false)} color="primary">
-            Cancelar
-          </Button>
-          <Button onClick={handleDeleteCompany} color="error" variant="contained">
-            Eliminar
-          </Button>
-        </DialogActions>
+        {companyToDelete && (
+          <>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                ¿Estás seguro de que deseas eliminar la empresa "{companyToDelete.name}"? Esta acción no se puede deshacer.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog} color="primary">
+                Cancelar
+              </Button>
+              <Button onClick={handleDeleteCompany} color="error" variant="contained">
+                Eliminar
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

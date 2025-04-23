@@ -198,7 +198,7 @@ export default function AdminUploadedDocumentsPage() {
           return { 
             id: doc.id, 
             ...data,
-            key: `doc-${doc.id}-${Date.now()}`
+            key: `doc-${doc.id}`
           };
         });
         
