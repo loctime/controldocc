@@ -1,20 +1,22 @@
-import React, { useState } from 'react';
-import { CompanyProvider } from '../../contexts/company-context';
+import React, { useState, useContext } from 'react';
+import { CompanyProvider, CompanyContext } from '../../contexts/company-context';
 import AdminCompanySelector from './AdminCompanySelector';
 import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
+import AdminDocumentApprovalPage from './AdminDocumentApprovalPage.tsx';
+import AdminRequiredDocumentsPage from './AdminRequiredDocumentsPage';
 import { Box, Tabs, Tab, Typography, Paper } from '@mui/material';
+import TaskIcon from '@mui/icons-material/Task';
+import AssignmentIcon from '@mui/icons-material/Assignment';  
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import {
   Dashboard as DashboardIcon,
   Description as DescriptionIcon,
   Business as BusinessIcon,
-  AssignmentTurnedIn as AssignmentTurnedInIcon
 } from '@mui/icons-material';
 
-// Componente para el panel de pestañas
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -29,13 +31,51 @@ function TabPanel(props) {
   );
 }
 
-export default function AdminPage() {
+function AdminTabs() {
   const [tabValue, setTabValue] = useState(0);
+  const { selectedCompany } = useContext(CompanyContext);
+
+  const tabConfig = [
+    { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
+    { icon: <DescriptionIcon />, label: 'Documentos Subidos', content: <AdminUploadedDocumentsPage /> },
+    { icon: <AssignmentTurnedInIcon />, label: 'Documentos Requeridos', content: <AdminRequiredDocumentsPage /> },
+    { icon: <AssignmentTurnedInIcon />, label: 'Aprobaciones', content: <AdminDocumentApprovalPage /> },
+    { icon: <TaskIcon />, label: 'Tareas', content: <AdminDocumentApprovalPage /> },
+  ];
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
+  return (
+    <>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
+          {tabConfig.map((tab, index) => (
+            <Tab key={index} icon={tab.icon} label={tab.label} iconPosition="start" />
+          ))}
+        </Tabs>
+      </Box>
+
+      {selectedCompany && (
+        <Typography variant="subtitle1" sx={{ mt: 2 }}>
+          Empresa seleccionada: <strong>{selectedCompany.name}</strong> (CUIT: {selectedCompany.cuit})
+        </Typography>
+      )}
+
+      {tabConfig.map((tab, index) => (
+        <TabPanel key={index} value={tabValue} index={index}>
+          <Typography variant="h6" gutterBottom>
+            {tab.label}
+          </Typography>
+          {tab.content}
+        </TabPanel>
+      ))}
+    </>
+  );
+}
+
+export default function AdminPage() {
   return (
     <CompanyProvider>
       <Box sx={{ p: 3 }}>
@@ -50,45 +90,7 @@ export default function AdminPage() {
         </Paper>
 
         <AdminCompanySelector />
-
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={tabValue} 
-            onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
-          >
-            <Tab 
-              label="Dashboard" 
-              icon={<DashboardIcon />} 
-              iconPosition="start"
-            />
-            <Tab 
-              label="Documentos Subidos" 
-              icon={<DescriptionIcon />} 
-              iconPosition="start"
-            />
-            <Tab 
-              label="Documentos Requeridos" 
-              icon={<AssignmentTurnedInIcon />} 
-              iconPosition="start"
-            />
-          </Tabs>
-        </Box>
-
-        <TabPanel value={tabValue} index={0}>
-          <AdminDashboard />
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
-          <AdminUploadedDocumentsPage />
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={2}>
-          <Typography variant="h6">
-            Aquí irá el componente para gestionar los documentos requeridos
-          </Typography>
-        </TabPanel>
+        <AdminTabs />
       </Box>
     </CompanyProvider>
   );

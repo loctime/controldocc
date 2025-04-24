@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+
+
 import {
   Box,
   Typography,
@@ -21,7 +23,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Badge
 } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PersonIcon from "@mui/icons-material/Person";
@@ -37,6 +40,8 @@ import DocumentosVehiculoForm from "./DocumentosVehiculoForm";
 import PersonalImportForm from "./PersonalImportForm";
 
 const UsuarioDashboard = () => {
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+
   const { user } = useContext(AuthContext);
   const [company, setCompany] = useState(null);
   const [requiredDocuments, setRequiredDocuments] = useState([]);
@@ -92,6 +97,17 @@ const UsuarioDashboard = () => {
         }));
 
         setRequiredDocuments(docsList);
+// Cargar documentos subidos
+const uploadedDocsQuery = query(
+  collection(db, "uploadedDocuments"),
+  where("companyId", "==", companyId)
+);
+const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
+const uploadedDocsList = uploadedDocsSnapshot.docs.map((doc) => ({
+  id: doc.id,
+  ...doc.data(),
+}));
+setUploadedDocuments(uploadedDocsList);
 
         // Cargar personal
         const personalQuery = query(
@@ -131,6 +147,13 @@ const UsuarioDashboard = () => {
     fetchCompanyAndDocuments();
   }, []);
 
+  const hasWarningsForType = (type) => {
+    const requiredForType = requiredDocuments.filter(doc => doc.entityType === type);
+    return requiredForType.some(doc => {
+      const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
+      return !uploaded || uploaded.status === "Pendiente de revisión" || uploaded.status === "Rechazado";
+    });
+  };
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
@@ -138,6 +161,18 @@ const UsuarioDashboard = () => {
       </Box>
     );
   }
+  const hasWarningsForPerson = (personaId) => {
+    return requiredDocuments
+      .filter(doc => doc.entityType === "employee")
+      .some(doc => {
+        const uploaded = uploadedDocuments.find(
+          up => up.entityId === personaId && up.requiredDocumentId === doc.id
+        );
+        return !uploaded || uploaded.status === "Pendiente de revisión" || uploaded.status === "Rechazado";
+      });
+  };
+  
+
 
   if (error) {
     return (
@@ -192,37 +227,42 @@ const UsuarioDashboard = () => {
                 No hay documentos requeridos configurados para esta empresa.
               </Typography>
             ) : (
-              <Grid container spacing={3}>
-                {/* Documentos de Empresa */}
-                <Grid item xs={12} md={4}>
-                  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Documentos de Empresa
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                      Documentos generales de la empresa
-                    </Typography>
-                    <Box sx={{ flexGrow: 1 }} />
-                    <Button 
-                      variant="contained" 
-                      color="primary"
-                      startIcon={<UploadFileIcon />}
-                      onClick={() => {
-                        setTabValue(3); // Cambiar a la pestaña de Empresa
-                      }}
-                      fullWidth
-                    >
-                      Ver Documentos
-                    </Button>
-                  </Paper>
-                </Grid>
+<Grid container spacing={3} columns={{ xs: 12, sm: 12, md: 12 }}>
+               {/* Documentos de Empresa */}
+               <Grid xs={12} md={4}>
+  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Badge color="error" variant="dot" invisible={!hasWarningsForType("company")}>
+      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+        Documentos de Empresa
+      </Typography>
+    </Badge>
+    <Typography variant="body2" sx={{ mb: 2 }}>
+      Documentos generales de la empresa
+    </Typography>
+    <Box sx={{ flexGrow: 1 }} />
+    <Button 
+      variant="contained" 
+      color="primary"
+      startIcon={<UploadFileIcon />}
+      onClick={() => {
+        setTabValue(3); // Cambiar a la pestaña de Empresa
+      }}
+      fullWidth
+    >
+      Ver Documentos
+    </Button>
+  </Paper>
+</Grid>
+
                 
                 {/* Documentos de Personal */}
-                <Grid item xs={12} md={4}>
+                <Grid xs={12} md={4}>
                   <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Documentos de Personal
-                    </Typography>
+                    <Badge color="error" variant="dot" invisible={!hasWarningsForType("employee")}>
+                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                        Documentos de Personal
+                      </Typography>
+                    </Badge>
                     <Typography variant="body2" sx={{ mb: 2 }}>
                       Documentos específicos para cada persona
                     </Typography>
@@ -241,29 +281,38 @@ const UsuarioDashboard = () => {
                   </Paper>
                 </Grid>
                 
-                {/* Documentos de Vehículos */}
-                <Grid item xs={12} md={4}>
-                  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Documentos de Vehículos
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                      Documentos específicos para cada vehículo
-                    </Typography>
-                    <Box sx={{ flexGrow: 1 }} />
-                    <Button 
-                      variant="contained" 
-                      color="primary"
-                      startIcon={<DirectionsCarIcon />}
-                      onClick={() => {
-                        setTabValue(2); // Cambiar a la pestaña de Vehículos
-                      }}
-                      fullWidth
-                    >
-                      Ver Vehículos
-                    </Button>
-                  </Paper>
-                </Grid>
+{/* Documentos de Vehículos */}
+<Grid xs={12} md={4}>
+
+  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    
+    {/* Badge correctamente colocado */}
+    <Badge color="error" variant="dot" invisible={!hasWarningsForType("vehicle")}>
+      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+        Documentos de Vehículos
+      </Typography>
+    </Badge>
+
+    <Typography variant="body2" sx={{ mb: 2 }}>
+      Documentos específicos para cada vehículo
+    </Typography>
+
+    <Box sx={{ flexGrow: 1 }} />
+
+    <Button 
+      variant="contained" 
+      color="primary"
+      startIcon={<DirectionsCarIcon />}
+      onClick={() => {
+        setTabValue(2); // Cambiar a la pestaña de Vehículos
+      }}
+      fullWidth
+    >
+      Ver Vehículos
+    </Button>
+  </Paper>
+</Grid>
+
               </Grid>
             )}
           </Paper>
@@ -281,20 +330,61 @@ const UsuarioDashboard = () => {
               <List>
                 {requiredDocuments.map((doc) => (
                   <React.Fragment key={doc.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <DescriptionIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={doc.name} 
-                        secondary={`Aplicable a: ${doc.entityType}`} 
-                      />
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
-            )}
+                    <ListItem secondaryAction={
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<CloudUploadIcon />}
+                        onClick={() => {
+                          // Determinar a qué entidad pertenece el documento
+                          if (doc.entityType === "company") {
+                            setTabValue(3); // Cambiar a la pestaña de Empresa
+                          } else if (doc.entityType === "employee") {
+                            setTabValue(1); // Cambiar a la pestaña de Personal
+                          } else if (doc.entityType === "vehicle") {
+                            setTabValue(2); // Cambiar a la pestaña de Vehículos
+                          }
+                        }}
+                      >
+                        Subir Documento
+                      </Button>
+                    }
+                  >
+                    <ListItemIcon>
+                      <DescriptionIcon color="primary" />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={doc.name} 
+                      secondary={
+                        <>
+                          <Typography component="span" variant="body2">
+                            Aplicable a: {doc.entityType}
+                          </Typography>
+                          <br />
+                          <Typography component="span" variant="body2" color="textSecondary">
+                            {doc.description || "Sin descripción"}
+                          </Typography>
+                          {doc.dueDate && (
+                            <>
+                              <br />
+                              <Typography 
+                                component="span" 
+                                variant="body2" 
+                                color={new Date(doc.dueDate) < new Date() ? "error" : "textSecondary"}
+                              >
+                                Fecha límite: {new Date(doc.dueDate).toLocaleDateString()}
+                              </Typography>
+                            </>
+                          )}
+                        </>
+                      } 
+                    />
+                  </ListItem>
+                  <Divider />
+                </React.Fragment>
+              ))}
+            </List>
+          )}
           </Paper>
         </>
       )}
@@ -339,22 +429,15 @@ const UsuarioDashboard = () => {
                 {personal.map((persona) => (
                   <Grid item xs={12} sm={6} md={4} key={persona.id}>
                     <Paper elevation={1} sx={{ p: 2 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {persona.nombre} {persona.apellido}
-                      </Typography>
+                    <Badge color="error" variant="dot" invisible={!hasWarningsForPerson(persona.id)}>
+  <Typography variant="subtitle1" fontWeight="bold">
+    {persona.nombre} {persona.apellido}
+  </Typography>
+</Badge>
+
                       <Typography variant="body2">
-                        DNI: {persona.dni} | Cargo: {persona.cargo}
+                        DNI: {persona.dni}
                       </Typography>
-                      {persona.telefono && (
-                        <Typography variant="body2">
-                          Teléfono: {persona.telefono}
-                        </Typography>
-                      )}
-                      {persona.email && (
-                        <Typography variant="body2">
-                          Email: {persona.email}
-                        </Typography>
-                      )}
                       <Button 
                         variant="outlined" 
                         color="primary"

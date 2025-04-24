@@ -11,10 +11,6 @@ import {
   Grid,
   Alert,
   Snackbar,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   CircularProgress
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
@@ -24,9 +20,6 @@ const PersonalForm = () => {
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [dni, setDni] = useState("");
-  const [cargo, setCargo] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -39,11 +32,11 @@ const PersonalForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!nombre.trim() || !apellido.trim() || !dni.trim() || !cargo.trim()) {
+    if (!nombre.trim() || !apellido.trim() || !dni.trim()) {
       setError("Por favor completa los campos obligatorios");
       return;
     }
-
+    
     setLoading(true);
     setError("");
 
@@ -59,9 +52,6 @@ const PersonalForm = () => {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim(),
-        cargo: cargo.trim(),
-        telefono: telefono.trim(),
-        email: email.trim(),
         companyId: companyId,
         createdAt: serverTimestamp(),
       };
@@ -73,9 +63,6 @@ const PersonalForm = () => {
       setNombre("");
       setApellido("");
       setDni("");
-      setCargo("");
-      setTelefono("");
-      setEmail("");
       
       // Mostrar mensaje de éxito
       setSuccess(true);
@@ -133,42 +120,6 @@ const PersonalForm = () => {
               onChange={(e) => setDni(e.target.value)}
               disabled={loading}
               required
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Cargo *</InputLabel>
-              <Select
-                value={cargo}
-                label="Cargo *"
-                onChange={(e) => setCargo(e.target.value)}
-                disabled={loading}
-              >
-                <MenuItem value="Gerente">Gerente</MenuItem>
-                <MenuItem value="Administrativo">Administrativo</MenuItem>
-                <MenuItem value="Operario">Operario</MenuItem>
-                <MenuItem value="Chofer">Chofer</MenuItem>
-                <MenuItem value="Otro">Otro</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Teléfono"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              disabled={loading}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
             />
           </Grid>
           <Grid item xs={12}>

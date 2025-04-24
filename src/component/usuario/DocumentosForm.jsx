@@ -412,7 +412,7 @@ const DocumentosForm = () => {
           <List>
             {uploadedDocuments.map((doc) => (
               <React.Fragment key={doc.id}>
-                <ListItem>
+                <ListItem component="button">
                   <ListItemIcon>
                     <DescriptionIcon color="primary" />
                   </ListItemIcon>

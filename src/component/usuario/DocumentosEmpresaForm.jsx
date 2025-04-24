@@ -55,7 +55,7 @@ const DocumentosEmpresaForm = () => {
         const docsQuery = query(
           collection(db, "requiredDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Empresa")
+          where("entityType", "==", "company")
         );
         
         const docsSnapshot = await getDocs(docsQuery);
@@ -70,7 +70,7 @@ const DocumentosEmpresaForm = () => {
         const uploadedDocsQuery = query(
           collection(db, "uploadedDocuments"),
           where("companyId", "==", companyId),
-          where("entityType", "==", "Empresa")
+          where("entityType", "==", "company")
         );
         
         const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
@@ -267,8 +267,8 @@ const DocumentosEmpresaForm = () => {
                   <List>
                     {requiredDocuments.map((doc) => (
                       <ListItem 
-                        key={doc.id} 
-                        button 
+                        key={doc.id}
+                        component="button"
                         selected={selectedDocument === doc.id}
                         onClick={() => setSelectedDocument(doc.id)}
                         disabled={(isDocumentUploaded(doc.id) && getDocumentStatusText(doc.id) !== "Rechazado") || uploading}
@@ -294,7 +294,19 @@ const DocumentosEmpresaForm = () => {
                         </ListItemIcon>
                         <ListItemText 
                           primary={doc.name} 
-                          secondary={getDocumentStatusText(doc.id)}
+                          secondary={<>
+                            {getDocumentStatusText(doc.id)}
+                            {doc.exampleImage && (
+                              <Box mt={1}>
+                                <Typography variant="caption" display="block">Ejemplo:</Typography>
+                                <img 
+                                  src={doc.exampleImage} 
+                                  alt={`Ejemplo de ${doc.name}`} 
+                                  style={{ maxWidth: '100%', maxHeight: 150, border: '1px solid #e0e0e0', borderRadius: 4 }} 
+                                />
+                              </Box>
+                            )}
+                          </>}
                         />
                       </ListItem>
                     ))}
@@ -395,6 +407,17 @@ const DocumentosEmpresaForm = () => {
                           >
                             Estado: {doc.status}
                           </Typography>
+                          {doc.exampleImage && (
+                            <>
+                              <br />
+                              <Typography variant="caption" component="span">Ejemplo:</Typography>
+                              <img 
+                                src={doc.exampleImage} 
+                                alt={`Ejemplo de ${doc.documentName}`} 
+                                style={{ maxWidth: '100%', maxHeight: 150, display: 'block', marginTop: 4, border: '1px solid #e0e0e0', borderRadius: 4 }} 
+                              />
+                            </>
+                          )}
                           <br />
                           <Typography variant="body2" component="span">
                             Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}

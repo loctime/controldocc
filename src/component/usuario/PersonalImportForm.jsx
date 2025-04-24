@@ -101,7 +101,7 @@ const PersonalImportForm = () => {
 
   // Validar una fila de datos de personal
   const validatePersonalRow = (row, rowNumber) => {
-    const requiredFields = ['nombre', 'apellido', 'dni', 'cargo'];
+    const requiredFields = ['nombre', 'apellido', 'dni', ];
     const missingFields = [];
     
     // Verificar campos requeridos
@@ -142,9 +142,6 @@ const PersonalImportForm = () => {
         nombre: row.nombre.trim(),
         apellido: row.apellido.trim(),
         dni: dni,
-        cargo: row.cargo.trim(),
-        telefono: row.telefono ? row.telefono.trim() : '',
-        email: row.email ? row.email.trim() : '',
         companyId: companyId,
         createdAt: serverTimestamp(),
         importedAt: serverTimestamp()
@@ -223,10 +220,7 @@ const PersonalImportForm = () => {
             Sube un archivo CSV con las siguientes columnas:
           </Typography>
           <Typography variant="body2" component="div">
-            <strong>Campos obligatorios:</strong> nombre, apellido, dni, cargo
-          </Typography>
-          <Typography variant="body2" component="div">
-            <strong>Campos opcionales:</strong> telefono, email
+            <strong>Campos obligatorios:</strong> nombre, apellido, dni
           </Typography>
         </Alert>
         
@@ -297,9 +291,6 @@ const PersonalImportForm = () => {
                   <TableCell>Nombre</TableCell>
                   <TableCell>Apellido</TableCell>
                   <TableCell>DNI</TableCell>
-                  <TableCell>Cargo</TableCell>
-                  <TableCell>Teléfono</TableCell>
-                  <TableCell>Email</TableCell>
                   <TableCell>Acciones</TableCell>
                 </TableRow>
               </TableHead>
@@ -309,9 +300,6 @@ const PersonalImportForm = () => {
                     <TableCell>{row.nombre}</TableCell>
                     <TableCell>{row.apellido}</TableCell>
                     <TableCell>{row.dni}</TableCell>
-                    <TableCell>{row.cargo}</TableCell>
-                    <TableCell>{row.telefono || '-'}</TableCell>
-                    <TableCell>{row.email || '-'}</TableCell>
                     <TableCell>
                       <IconButton 
                         size="small" 

@@ -5,6 +5,9 @@ import { db, auth } from "../../firebaseconfig";
 import { collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { styled, useTheme } from "@mui/material/styles";
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+
 import {
   Box,
   Drawer,
@@ -180,6 +183,16 @@ export default function AdminLayout() {
       path: '/admin/uploaded-documents',
       highlight: true // Marcamos esta opción para destacarla
     },
+    { 
+      text: 'Tareas',
+      icon: <AssignmentIcon />,
+      path: '/admin/tareas'
+    },
+    { 
+      text: 'Aprobaciones',
+      icon: <AssignmentTurnedInIcon />,
+      path: '/admin/approvals'
+    }
   ];
 
   return (

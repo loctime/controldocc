@@ -130,23 +130,6 @@ const VehiculosForm = () => {
             />
           </Grid>
           <Grid item xs={12}>
-            <FormControl fullWidth required>
-              <InputLabel>Tipo de Vehículo *</InputLabel>
-              <Select
-                value={tipo}
-                label="Tipo de Vehículo *"
-                onChange={(e) => setTipo(e.target.value)}
-                disabled={loading}
-              >
-                <MenuItem value="Camión">Camión</MenuItem>
-                <MenuItem value="Camioneta">Camioneta</MenuItem>
-                <MenuItem value="Automóvil">Automóvil</MenuItem>
-                <MenuItem value="Maquinaria">Maquinaria</MenuItem>
-                <MenuItem value="Otro">Otro</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12}>
             <Button
               type="submit"
               variant="contained"

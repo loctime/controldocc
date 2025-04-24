@@ -13,6 +13,7 @@ import AdminCompaniesPage from "../component/administrador/AdminCompaniesPage";
 import AdminRequiredDocumentsPage from "../component/administrador/AdminRequiredDocumentsPage";
 import AdminUploadedDocumentsPage from "../component/administrador/AdminUploadedDocumentsPage";
 import UsuarioDashboard from "../component/usuario/UsuarioDashboard";
+import AdminDocumentApprovalPage from "../component/administrador/AdminDocumentApprovalPage.jsx";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useContext(AuthContext);
@@ -101,6 +102,8 @@ const AppRouter = () => {
             <Route path="companies" element={<AdminCompaniesPage />} />
             <Route path="required-documents" element={<AdminRequiredDocumentsPage />} />
             <Route path="uploaded-documents" element={<AdminUploadedDocumentsPage />} />
+            <Route path="/admin/tareas" element={<AdminDocumentApprovalPage />} />
+            <Route path="/admin/approvals" element={<AdminDocumentApprovalPage />} />
           </Route>
 
           {/* Rutas para usuarios empresa */}

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompany } from "../../contexts/company-context";
+import { storage } from "../../firebaseconfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Box,
   Typography,
@@ -51,6 +53,9 @@ export default function AdminRequiredDocumentsPage() {
     open: false,
     documentId: null
   });
+  const [exampleImage, setExampleImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { selectedCompanyId } = useCompany();
   const theme = useTheme();
@@ -96,12 +101,21 @@ export default function AdminRequiredDocumentsPage() {
       if (deadlineType === "biannual") deadline.months = months;
       if (deadlineType === "custom") deadline.date = date;
 
+      // Subir imagen si se pegó directamente
+      let exampleImageUrl = exampleImage;
+      if (exampleImage && typeof exampleImage !== 'string') {
+        const storageRef = ref(storage, `documentExamples/${selectedCompanyId}_${Date.now()}_example.png`);
+        await uploadBytes(storageRef, exampleImage);
+        exampleImageUrl = await getDownloadURL(storageRef);
+      }
+
       const newDocument = {
         name: newDocName.trim(),
         entityType,
         companyId: selectedCompanyId,
         allowedFileTypes: [".pdf", ".jpg", ".jpeg", ".png"],
         deadline,
+        exampleImage: exampleImageUrl || "",
         createdAt: new Date().toISOString(),
       };
 
@@ -112,12 +126,46 @@ export default function AdminRequiredDocumentsPage() {
       setDay(1);
       setMonths([1, 7]);
       setDate("");
+      setExampleImage(null);
+      setImagePreview("");
       loadDocuments();
     } catch (error) {
       console.error("Error creating document:", error);
       setError("Error al crear el documento.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+  
+    try {
+      setIsUploadingImage(true);
+      const storageRef = ref(storage, `documentExamples/${selectedCompanyId}_${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      setExampleImage(downloadURL);
+      setImagePreview(URL.createObjectURL(file));
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setError("Error al subir la imagen de ejemplo");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handlePasteImage = (e) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const blob = items[i].getAsFile();
+        const imageUrl = URL.createObjectURL(blob);
+        setImagePreview(imageUrl);
+        setExampleImage(blob);
+        break;
+      }
     }
   };
 
@@ -240,6 +288,49 @@ export default function AdminRequiredDocumentsPage() {
               sx={{ width: 200 }}
             />
           )}
+          <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="subtitle2">Imagen de ejemplo (opcional)</Typography>
+            <Box 
+              sx={{ 
+                border: '1px dashed', 
+                borderColor: 'divider', 
+                p: 2, 
+                borderRadius: 1,
+                minHeight: 100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                position: 'relative'
+              }}
+              onPaste={handlePasteImage}
+            >
+              {imagePreview ? (
+                <img 
+                  src={imagePreview} 
+                  alt="Ejemplo de documento" 
+                  style={{ maxWidth: '100%', maxHeight: 200 }} 
+                />
+              ) : (
+                <Typography textAlign="center" color="text.secondary">
+                  Pega una imagen aquí o sube un archivo
+                </Typography>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                disabled={isUploadingImage}
+              />
+            </Box>
+            {isUploadingImage && (
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircularProgress size={20} />
+                <Typography variant="caption">Subiendo imagen...</Typography>
+              </Box>
+            )}
+          </Box>
           <Button
             type="submit"
             variant="contained"

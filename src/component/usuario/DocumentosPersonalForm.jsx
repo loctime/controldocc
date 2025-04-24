@@ -136,7 +136,7 @@ const DocumentosPersonalForm = ({ persona }) => {
         companyId,
         requiredDocumentId: selectedDocument,
         documentName: selectedDocData.name,
-        entityType: "Personal",
+        entityType: "employee",
         entityId: persona.id,
         entityName: `${persona.nombre} ${persona.apellido}`,
         fileURL: downloadURL,
@@ -279,8 +279,8 @@ const DocumentosPersonalForm = ({ persona }) => {
                   <List>
                     {requiredDocuments.map((doc) => (
                       <ListItem 
-                        key={doc.id} 
-                        button 
+                        key={doc.id}
+                        component="button"
                         selected={selectedDocument === doc.id}
                         onClick={() => setSelectedDocument(doc.id)}
                         disabled={(isDocumentUploaded(doc.id) && getDocumentStatusText(doc.id) !== "Rechazado") || uploading}
@@ -315,9 +315,21 @@ const DocumentosPersonalForm = ({ persona }) => {
                               </Typography>
                             )}
                           </>} 
-                          secondary={isDocumentUploaded(doc.id) 
-                            ? getDocumentStatusText(doc.id) 
-                            : "Pendiente - Este documento debe ser subido para este empleado"}
+                          secondary={<>
+                            {isDocumentUploaded(doc.id) 
+                              ? getDocumentStatusText(doc.id) 
+                              : "Pendiente - Este documento debe ser subido para este empleado"}
+                            {doc.exampleImage && (
+                              <Box mt={1}>
+                                <Typography variant="caption" display="block">Ejemplo:</Typography>
+                                <img 
+                                  src={doc.exampleImage} 
+                                  alt={`Ejemplo de ${doc.documentName}`} 
+                                  style={{ maxWidth: '100%', maxHeight: 150, border: '1px solid #e0e0e0', borderRadius: 4 }} 
+                                />
+                              </Box>
+                            )}
+                          </>}
                         />
                       </ListItem>
                     ))}
@@ -445,6 +457,17 @@ const DocumentosPersonalForm = ({ persona }) => {
                                 <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
                                 Debe volver a subir este documento
                               </Typography>
+                            </>
+                          )}
+                          {doc.exampleImage && (
+                            <>
+                              <br />
+                              <Typography variant="caption" component="span">Ejemplo:</Typography>
+                              <img 
+                                src={doc.exampleImage} 
+                                alt={`Ejemplo de ${doc.documentName}`} 
+                                style={{ maxWidth: '100%', maxHeight: 150, display: 'block', marginTop: 4, border: '1px solid #e0e0e0', borderRadius: 4 }} 
+                              />
                             </>
                           )}
                         </>
