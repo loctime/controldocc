@@ -65,17 +65,21 @@ const DocumentItem = React.memo(({ document, onView, onApprove, onReject, onOpen
         <DescriptionIcon color="primary" />
       </ListItemIcon>
       <ListItemText 
-        primary={
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="subtitle1">{document.documentName || 'Sin nombre'}</Typography>
-            <Chip 
-              size="small" 
-              label={document.status || 'Pendiente'}
-              color={getStatusColor(document.status)}
-              sx={{ ml: 1 }}
-            />
-          </Box>
-        } 
+  primary={
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <Typography variant="subtitle1" component="div">
+        {document.documentName || 'Sin nombre'}
+      </Typography>
+      <Chip 
+        size="small" 
+        label={document.status || 'Pendiente'}
+        color={getStatusColor(document.status)}
+        sx={{ ml: 1 }}
+      />
+    </Box>
+  }
+/>
+
         secondary={
           <>
             <Typography variant="body2" component="span">
@@ -115,7 +119,6 @@ const DocumentItem = React.memo(({ document, onView, onApprove, onReject, onOpen
             )}
           </>
         } 
-      />
       <ListItemSecondaryAction>
         {document.status === 'Pendiente de revisión' && (
           <>

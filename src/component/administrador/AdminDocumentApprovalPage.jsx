@@ -129,24 +129,26 @@ export default function AdminDocumentApprovalPage() {
                   <ListItemText
                     primary={
                       <Box display="flex" alignItems="center" gap={1}>
-                        <Typography fontWeight="medium">
+                        <Typography component="div" fontWeight="medium">
                           {doc.documentName}
                         </Typography>
                         {doc.daysRemaining !== null && (
                           <Chip
                             label={`${doc.daysRemaining}d`}
-                            color={
-                              doc.daysRemaining <= 0
-                                ? "error"
-                                : doc.daysRemaining <= 7
-                                ? "warning"
-                                : "success"
-                            }
-                            size="small"
-                          />
-                        )}
-                      </Box>
-                    }
+          color={
+            doc.daysRemaining <= 0
+              ? "error"
+              : doc.daysRemaining <= 7
+              ? "warning"
+              : "success"
+          }
+          size="small"
+        />
+      )}
+    </Box>
+  }
+/>
+
                     secondary={
                       <>
                         <Typography variant="body2">
@@ -157,7 +159,6 @@ export default function AdminDocumentApprovalPage() {
                         </Typography>
                       </>
                     }
-                  />
                   <Box display="flex" gap={1}>
                     <Tooltip title="Previsualizar">
                       <IconButton onClick={() => window.open(doc.fileURL, '_blank')}>

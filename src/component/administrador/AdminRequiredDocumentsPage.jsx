@@ -4,8 +4,7 @@ import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompany } from "../../contexts/company-context";
-import { storage } from "../../firebaseconfig";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { uploadFile } from "../../services/backblazeService.js";
 import {
   Box,
   Typography,
@@ -101,13 +100,23 @@ export default function AdminRequiredDocumentsPage() {
       if (deadlineType === "biannual") deadline.months = months;
       if (deadlineType === "custom") deadline.date = date;
 
-      // Subir imagen si se pegó directamente
       let exampleImageUrl = exampleImage;
       if (exampleImage && typeof exampleImage !== 'string') {
-        const storageRef = ref(storage, `documentExamples/${selectedCompanyId}_${Date.now()}_example.png`);
-        await uploadBytes(storageRef, exampleImage);
-        exampleImageUrl = await getDownloadURL(storageRef);
-      }
+        const formData = new FormData();
+        formData.append("file", exampleImage);
+        formData.append("folder", "documentExamples");
+
+        const res = await fetch("http://localhost:3000/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+  if (!res.ok) throw new Error("Error al subir la imagen de ejemplo");
+
+  const data = await res.json();
+  exampleImageUrl = data.url;
+}
+
 
       const newDocument = {
         name: newDocName.trim(),
@@ -143,11 +152,23 @@ export default function AdminRequiredDocumentsPage() {
   
     try {
       setIsUploadingImage(true);
-      const storageRef = ref(storage, `documentExamples/${selectedCompanyId}_${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-      setExampleImage(downloadURL);
-      setImagePreview(URL.createObjectURL(file));
+  
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "documentExamples");
+  
+      const res = await fetch("http://localhost:3000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+  
+      const data = await res.json();
+      if (res.ok) {
+        setExampleImage(data.downloadUrl); // o como lo devuelva tu backend
+        setImagePreview(URL.createObjectURL(file));
+      } else {
+        throw new Error(data.message || "Upload failed");
+      }
     } catch (error) {
       console.error("Error uploading image:", error);
       setError("Error al subir la imagen de ejemplo");

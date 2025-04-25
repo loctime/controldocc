@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "../../firebaseconfig";
+import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Box,
   Typography,
@@ -181,14 +180,22 @@ const DocumentosForm = () => {
       // Crear una referencia única para el archivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${companyId}_${selectedDocument}_${selectedEntity || 'empresa'}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `documents/${fileName}`);
-      
-      // Subir el archivo a Firebase Storage
-      await uploadBytes(storageRef, file);
-      
-      // Obtener la URL de descarga
-      const downloadURL = await getDownloadURL(storageRef);
-      
+    
+      // Subir el archivo al backend que maneja Backblaze
+      const formData = new FormData();
+      formData.append("file", file);
+    
+      const response = await fetch("http://localhost:3000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+    
+      if (!response.ok) {
+        throw new Error("Error al subir el archivo");
+      }
+    
+      const { url: downloadURL } = await response.json();
+    
       // Guardar la referencia en Firestore
       const docData = {
         companyId,
@@ -417,19 +424,20 @@ const DocumentosForm = () => {
                     <DescriptionIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText
-                    primary={doc.documentName}
-                    secondary={
-                      <>
-                        <Typography variant="body2" component="span">
-                          {doc.entityType}: {doc.entityName} | Estado: {doc.status}
-                        </Typography>
-                        <br />
-                        <Typography variant="body2" component="span">
-                          Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
-                        </Typography>
-                      </>
-                    }
-                  />
+  primary={doc.documentName}
+  secondary={
+    <>
+      <Typography variant="body2" component="div">
+        {doc.entityType}: {doc.entityName} | Estado: {doc.status}
+      </Typography>
+      <Typography variant="body2" component="div">
+        Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
+      </Typography>
+    </>
+  }
+  secondaryTypographyProps={{ component: "div" }}
+/>
+
                   <ListItemSecondaryAction>
                     <IconButton 
                       edge="end" 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "../../firebaseconfig";
+import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Box,
   Typography,
@@ -123,14 +122,22 @@ const DocumentosPersonalForm = ({ persona }) => {
       // Crear una referencia única para el archivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${companyId}_${selectedDocument}_personal_${persona.id}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `documents/${fileName}`);
-      
-      // Subir el archivo a Firebase Storage
-      await uploadBytes(storageRef, file);
-      
-      // Obtener la URL de descarga
-      const downloadURL = await getDownloadURL(storageRef);
-      
+    
+      // Preparar el archivo para subirlo vía tu backend (Backblaze)
+      const formData = new FormData();
+      formData.append("file", file);
+    
+      const response = await fetch("http://localhost:3000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+    
+      if (!response.ok) {
+        throw new Error("Error al subir el archivo personal");
+      }
+    
+      const { url: downloadURL } = await response.json();
+    
       // Guardar la referencia en Firestore
       const docData = {
         companyId,
@@ -413,66 +420,72 @@ const DocumentosPersonalForm = ({ persona }) => {
                       <DescriptionIcon color="primary" />
                     </ListItemIcon>
                     <ListItemText
-                      primary={doc.documentName}
-                      secondary={
-                        <>
-                          <Typography 
-                            variant="body2" 
-                            component="span" 
-                            sx={{
-                              color: doc.status === "Aprobado" 
-                                ? "success.main" 
-                                : doc.status === "Rechazado" 
-                                  ? "error.main" 
-                                  : "warning.main",
-                              fontWeight: "bold"
-                            }}
-                          >
-                            Estado: {doc.status}
-                          </Typography>
-                          <br />
-                          <Typography variant="body2" component="span">
-                            Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
-                          </Typography>
-                          {doc.comment && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span">
-                                Comentario: {doc.comment}
-                              </Typography>
-                            </>
-                          )}
-                          {doc.adminComment && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span" sx={{ fontWeight: "bold" }}>
-                                Comentario del revisor: {doc.adminComment}
-                              </Typography>
-                            </>
-                          )}
-                          {doc.status === "Rechazado" && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span" color="error">
-                                <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
-                                Debe volver a subir este documento
-                              </Typography>
-                            </>
-                          )}
-                          {doc.exampleImage && (
-                            <>
-                              <br />
-                              <Typography variant="caption" component="span">Ejemplo:</Typography>
-                              <img 
-                                src={doc.exampleImage} 
-                                alt={`Ejemplo de ${doc.documentName}`} 
-                                style={{ maxWidth: '100%', maxHeight: 150, display: 'block', marginTop: 4, border: '1px solid #e0e0e0', borderRadius: 4 }} 
-                              />
-                            </>
-                          )}
-                        </>
-                      }
-                    />
+  primary={doc.documentName}
+  secondaryTypographyProps={{ component: "div" }}
+  secondary={
+    <>
+      <Typography
+        variant="body2"
+        component="div"
+        sx={{
+          color:
+            doc.status === "Aprobado"
+              ? "success.main"
+              : doc.status === "Rechazado"
+              ? "error.main"
+              : "warning.main",
+          fontWeight: "bold"
+        }}
+      >
+        Estado: {doc.status}
+      </Typography>
+
+      <Typography variant="body2" component="div">
+        Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
+      </Typography>
+
+      {doc.comment && (
+        <Typography variant="body2" component="div">
+          Comentario: {doc.comment}
+        </Typography>
+      )}
+
+      {doc.adminComment && (
+        <Typography variant="body2" component="div" sx={{ fontWeight: "bold" }}>
+          Comentario del revisor: {doc.adminComment}
+        </Typography>
+      )}
+
+      {doc.status === "Rechazado" && (
+        <Typography variant="body2" component="div" color="error">
+          <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
+          Debe volver a subir este documento
+        </Typography>
+      )}
+
+      {doc.exampleImage && (
+        <>
+          <Typography variant="caption" component="div">
+            Ejemplo:
+          </Typography>
+          <img
+            src={doc.exampleImage}
+            alt={`Ejemplo de ${doc.documentName}`}
+            style={{
+              maxWidth: "100%",
+              maxHeight: 150,
+              display: "block",
+              marginTop: 4,
+              border: "1px solid #e0e0e0",
+              borderRadius: 4
+            }}
+          />
+        </>
+      )}
+    </>
+  }
+/>
+
                     <ListItemSecondaryAction>
                       <IconButton 
                         edge="end" 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "../../firebaseconfig";
+import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Box,
   Typography,
@@ -118,14 +117,20 @@ const DocumentosEmpresaForm = () => {
       // Crear una referencia única para el archivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${companyId}_${selectedDocument}_empresa_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `documents/${fileName}`);
-      
-      // Subir el archivo a Firebase Storage
-      await uploadBytes(storageRef, file);
-      
-      // Obtener la URL de descarga
-      const downloadURL = await getDownloadURL(storageRef);
-      
+    
+      // Preparar archivo para subir a tu backend (que sube a Backblaze)
+      const formData = new FormData();
+      formData.append("file", file);
+    
+      const response = await fetch("http://localhost:3000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+    
+      if (!response.ok) throw new Error("Error al subir el documento");
+    
+      const { url: downloadURL } = await response.json();
+    
       // Guardar la referencia en Firestore
       const docData = {
         companyId,
@@ -142,7 +147,7 @@ const DocumentosEmpresaForm = () => {
         status: "Pendiente de revisión",
         comment: comment || ""
       };
-      
+    
       await addDoc(collection(db, "uploadedDocuments"), docData);
       
       // Limpiar el formulario
@@ -293,21 +298,30 @@ const DocumentosEmpresaForm = () => {
                           )}
                         </ListItemIcon>
                         <ListItemText 
-                          primary={doc.name} 
-                          secondary={<>
-                            {getDocumentStatusText(doc.id)}
-                            {doc.exampleImage && (
-                              <Box mt={1}>
-                                <Typography variant="caption" display="block">Ejemplo:</Typography>
-                                <img 
-                                  src={doc.exampleImage} 
-                                  alt={`Ejemplo de ${doc.name}`} 
-                                  style={{ maxWidth: '100%', maxHeight: 150, border: '1px solid #e0e0e0', borderRadius: 4 }} 
-                                />
-                              </Box>
-                            )}
-                          </>}
-                        />
+  primary={doc.name} 
+  secondary={
+    <>
+      {getDocumentStatusText(doc.id)}
+      {doc.exampleImage && (
+        <Box mt={1}>
+          <Typography variant="caption" display="block">Ejemplo:</Typography>
+          <img 
+            src={doc.exampleImage} 
+            alt={`Ejemplo de ${doc.name}`} 
+            style={{ 
+              maxWidth: '100%', 
+              maxHeight: 150, 
+              border: '1px solid #e0e0e0', 
+              borderRadius: 4 
+            }} 
+          />
+        </Box>
+      )}
+    </>
+  }
+  secondaryTypographyProps={{ component: "div" }}
+/>
+
                       </ListItem>
                     ))}
                   </List>

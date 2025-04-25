@@ -354,31 +354,31 @@ setUploadedDocuments(uploadedDocsList);
                       <DescriptionIcon color="primary" />
                     </ListItemIcon>
                     <ListItemText 
-                      primary={doc.name} 
-                      secondary={
-                        <>
-                          <Typography component="span" variant="body2">
-                            Aplicable a: {doc.entityType}
-                          </Typography>
-                          <br />
-                          <Typography component="span" variant="body2" color="textSecondary">
-                            {doc.description || "Sin descripción"}
-                          </Typography>
-                          {doc.dueDate && (
-                            <>
-                              <br />
-                              <Typography 
-                                component="span" 
-                                variant="body2" 
-                                color={new Date(doc.dueDate) < new Date() ? "error" : "textSecondary"}
-                              >
-                                Fecha límite: {new Date(doc.dueDate).toLocaleDateString()}
-                              </Typography>
-                            </>
-                          )}
-                        </>
-                      } 
-                    />
+  primary={doc.name}
+  secondaryTypographyProps={{ component: "div" }}
+  secondary={
+    <>
+      <Typography component="div" variant="body2">
+        Aplicable a: {doc.entityType}
+      </Typography>
+
+      <Typography component="div" variant="body2" color="textSecondary">
+        {doc.description || "Sin descripción"}
+      </Typography>
+
+      {doc.dueDate && (
+        <Typography 
+          component="div" 
+          variant="body2" 
+          color={new Date(doc.dueDate) < new Date() ? "error" : "textSecondary"}
+        >
+          Fecha límite: {new Date(doc.dueDate).toLocaleDateString()}
+        </Typography>
+      )}
+    </>
+  }
+/>
+
                   </ListItem>
                   <Divider />
                 </React.Fragment>

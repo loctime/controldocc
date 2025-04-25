@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "../../firebaseconfig";
+import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   Box,
   Typography,
@@ -119,14 +118,22 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
       // Crear una referencia única para el archivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${companyId}_${selectedDocument}_vehiculo_${vehiculo.id}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `documents/${fileName}`);
-      
-      // Subir el archivo a Firebase Storage
-      await uploadBytes(storageRef, file);
-      
-      // Obtener la URL de descarga
-      const downloadURL = await getDownloadURL(storageRef);
-      
+    
+      // Preparar archivo y enviarlo a tu backend
+      const formData = new FormData();
+      formData.append("file", file);
+    
+      const response = await fetch("http://localhost:3000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+    
+      if (!response.ok) {
+        throw new Error("Error al subir el archivo del vehículo");
+      }
+    
+      const { url: downloadURL } = await response.json();
+    
       // Guardar la referencia en Firestore
       const docData = {
         companyId,
@@ -301,20 +308,31 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
                           )}
                         </ListItemIcon>
                         <ListItemText 
-                          primary={<>
-                            <Typography component="span" variant="subtitle1">
-                              {doc.documentName}
-                            </Typography>
-                            {!isDocumentUploaded(doc.id) && (
-                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'error.main', fontWeight: 'bold' }}>
-                                (REQUERIDO)
-                              </Typography>
-                            )}
-                          </>} 
-                          secondary={isDocumentUploaded(doc.id) 
-                            ? getDocumentStatusText(doc.id) 
-                            : "Pendiente - Este documento debe ser subido para este vehículo"}
-                        />
+  primaryTypographyProps={{ component: "div" }}
+  primary={
+    <>
+      <Typography component="span" variant="subtitle1">
+        {doc.documentName}
+      </Typography>
+      {!isDocumentUploaded(doc.id) && (
+        <Typography
+          component="span"
+          variant="caption"
+          sx={{ ml: 1, color: 'error.main', fontWeight: 'bold' }}
+        >
+          (REQUERIDO)
+        </Typography>
+      )}
+    </>
+  }
+  secondaryTypographyProps={{ component: "div" }}
+  secondary={
+    isDocumentUploaded(doc.id)
+      ? getDocumentStatusText(doc.id)
+      : "Pendiente - Este documento debe ser subido para este vehículo"
+  }
+/>
+
                       </ListItem>
                     ))}
                   </List>
@@ -397,55 +415,55 @@ const DocumentosVehiculoForm = ({ vehiculo }) => {
                       <DescriptionIcon color="primary" />
                     </ListItemIcon>
                     <ListItemText
-                      primary={doc.documentName}
-                      secondary={
-                        <>
-                          <Typography 
-                            variant="body2" 
-                            component="span" 
-                            sx={{
-                              color: doc.status === "Aprobado" 
-                                ? "success.main" 
-                                : doc.status === "Rechazado" 
-                                  ? "error.main" 
-                                  : "warning.main",
-                              fontWeight: "bold"
-                            }}
-                          >
-                            Estado: {doc.status}
-                          </Typography>
-                          <br />
-                          <Typography variant="body2" component="span">
-                            Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
-                          </Typography>
-                          {doc.comment && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span">
-                                Comentario: {doc.comment}
-                              </Typography>
-                            </>
-                          )}
-                          {doc.adminComment && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span" sx={{ fontWeight: "bold" }}>
-                                Comentario del revisor: {doc.adminComment}
-                              </Typography>
-                            </>
-                          )}
-                          {doc.status === "Rechazado" && (
-                            <>
-                              <br />
-                              <Typography variant="body2" component="span" color="error">
-                                <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
-                                Debe volver a subir este documento
-                              </Typography>
-                            </>
-                          )}
-                        </>
-                      }
-                    />
+  primary={doc.documentName}
+  secondaryTypographyProps={{ component: "div" }} // <- clave para evitar el warning
+  secondary={
+    <>
+      <Typography
+        variant="body2"
+        component="div"
+        sx={{
+          color:
+            doc.status === "Aprobado"
+              ? "success.main"
+              : doc.status === "Rechazado"
+              ? "error.main"
+              : "warning.main",
+          fontWeight: "bold"
+        }}
+      >
+        Estado: {doc.status}
+      </Typography>
+
+      <Typography variant="body2" component="div">
+        Subido:{" "}
+        {doc.uploadedAt
+          ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString()
+          : "Recién subido"}
+      </Typography>
+
+      {doc.comment && (
+        <Typography variant="body2" component="div">
+          Comentario: {doc.comment}
+        </Typography>
+      )}
+
+      {doc.adminComment && (
+        <Typography variant="body2" component="div" sx={{ fontWeight: "bold" }}>
+          Comentario del revisor: {doc.adminComment}
+        </Typography>
+      )}
+
+      {doc.status === "Rechazado" && (
+        <Typography variant="body2" component="div" color="error">
+          <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
+          Debe volver a subir este documento
+        </Typography>
+      )}
+    </>
+  }
+/>
+
                     <ListItemSecondaryAction>
                       <IconButton 
                         edge="end" 

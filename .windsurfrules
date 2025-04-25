@@ -1,0 +1,15 @@
+📁 Proyecto: Plataforma de carga de documentos empresariales
+
+1. El objetivo es crear una plataforma web para que empresas suban y gestionen documentos como constancias de AFIP, patentes de camiones y certificados.
+2. El enfoque principal es que la experiencia sea simple, intuitiva, profesional y de uso directo.
+3. El stack tecnológico es:
+   - Frontend: React con Vite
+   - Backend: Firebase (Auth, Firestore, Functions)
+   - Almacenamiento: Backblaze B2
+4. Se prioriza la lógica y la funcionalidad por encima de la escritura de código perfecta.
+5. Se debe facilitar la comprensión y mantenimiento del proyecto, sin complejidad innecesaria.
+6. Cada componente debe resolver un problema claro, y debe estar bien nombrado para entenderse fácilmente.
+7. Toda subida de archivos debe validar tipo, tamaño, y asociarse correctamente a la empresa y su tipo de documento.
+8. La interfaz debe ser accesible y pensada desde la perspectiva de un usuario sin conocimientos técnicos.
+
+🎯 Esta regla guía todas las decisiones técnicas y de diseño para este proyecto.
