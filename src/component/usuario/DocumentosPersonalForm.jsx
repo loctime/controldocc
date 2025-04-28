@@ -143,9 +143,9 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
 
   const getDocStatus = (docId) => uploadedDocuments.find(d => d.requiredDocumentId === docId);
 
-  const getDeadlineColor = (expiryDate) => {
-    if (!expiryDate) return "default";
-    const diff = (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+  const getDeadlineColor = (expirationDate) => {
+    if (!expirationDate) return "default";
+    const diff = (new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
     if (diff <= 0) return "error.light";
     if (diff <= 2) return "error.main";
     if (diff <= 5) return "error";
@@ -165,7 +165,7 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
           <Grid container spacing={2}>
             {requiredDocuments.map(doc => {
               const status = getDocStatus(doc.id);
-              const vencimientoColor = getDeadlineColor(status?.expiryDate);
+              const vencimientoColor = getDeadlineColor(status?.expirationDate);
               const canUpload = !status || status.status === "Rechazado";
               return (
                 <Grid item xs={12} sm={6} md={4} key={doc.id}>
@@ -179,9 +179,9 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
                         <Chip size="small" label={status.status} color={status.status === "Aprobado" ? "success" : status.status === "Rechazado" ? "error" : "warning"} />
                       )}
                     </Box>
-                    {status?.expiryDate && (
+                    {status?.expirationDate && (
                       <Typography variant="body2" color={vencimientoColor} mt={1}>
-                        Vence: {new Date(status.expiryDate).toLocaleDateString()}
+                        Vence: {new Date(status.expirationDate).toLocaleDateString()}
                       </Typography>
                     )}
                   </Paper>

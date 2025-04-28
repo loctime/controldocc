@@ -73,7 +73,7 @@ export default function DocumentosEmpresaForm() {
         uploadedAt: serverTimestamp(),
         status: "Pendiente de revisión",
         comment: comment || "",
-        expiryDate: calculateInitialExpiryDate(selectedDocData)
+        expirationDate: calculateInitialExpirationDate(selectedDocData)
       };
 
       await addDoc(collection(db, "uploadedDocuments"), newDoc);
@@ -86,7 +86,7 @@ export default function DocumentosEmpresaForm() {
     }
   };
 
-  const calculateInitialExpiryDate = (doc) => {
+  const calculateInitialExpirationDate = (doc) => {
     if (!doc || !doc.deadline) return null;
     const now = new Date();
     if (doc.deadline.type === "custom") return doc.deadline.date;

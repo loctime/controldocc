@@ -157,9 +157,9 @@ const UsuarioDashboard = () => {
     fetchCompanyAndDocuments();
   }, []);
 
-  const getDeadlineColor = (expiryDate) => {
-    if (!expiryDate) return "textSecondary";
-    const diff = (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+  const getDeadlineColor = (expirationDate) => {
+    if (!expirationDate) return "textSecondary";
+    const diff = (new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
     if (diff <= 0) return "error.main";
     if (diff <= 2) return "error.dark";
     if (diff <= 5) return "warning.main";
@@ -509,8 +509,8 @@ const UsuarioDashboard = () => {
               const uploaded = uploadedDocuments.find(
                 up => up.entityId === persona.id && up.requiredDocumentId === doc.id
               );
-              const color = uploaded?.expiryDate ? getDeadlineColor(uploaded.expiryDate) : "textSecondary";
-              const vencimientoFecha = uploaded?.expiryDate ? new Date(uploaded.expiryDate).toLocaleDateString() : null;
+              const color = uploaded?.expirationDate ? getDeadlineColor(uploaded.expirationDate) : "textSecondary";
+              const vencimientoFecha = uploaded?.expirationDate ? new Date(uploaded.expirationDate).toLocaleDateString() : null;
 
               return (
                 <TableCell key={doc.id}>
@@ -526,9 +526,9 @@ const UsuarioDashboard = () => {
                       >
                         {uploaded.status}
                       </Typography>
-                      {uploaded?.expiryDate && (
-                        <Typography variant="caption" color={getDeadlineColor(uploaded.expiryDate)}>
-                          Vence: {new Date(uploaded.expiryDate).toLocaleDateString()}
+                      {uploaded?.expirationDate && (
+                        <Typography variant="caption" color={getDeadlineColor(uploaded.expirationDate)}>
+                          Vence: {new Date(uploaded.expirationDate).toLocaleDateString()}
                         </Typography>
                       )}
                       {uploaded.status === "Rechazado" && (
@@ -699,8 +699,8 @@ const UsuarioDashboard = () => {
           const uploaded = uploadedDocuments.find(
             up => up.entityId === vehiculo.id && up.requiredDocumentId === doc.id
           );
-          const color = uploaded?.expiryDate ? getDeadlineColor(uploaded.expiryDate) : "textSecondary";
-          const vencimientoFecha = uploaded?.expiryDate ? new Date(uploaded.expiryDate).toLocaleDateString() : null;
+          const color = uploaded?.expirationDate ? getDeadlineColor(uploaded.expirationDate) : "textSecondary";
+          const vencimientoFecha = uploaded?.expirationDate ? new Date(uploaded.expirationDate).toLocaleDateString() : null;
 
           return (
             <TableCell key={doc.id}>
@@ -716,9 +716,9 @@ const UsuarioDashboard = () => {
                   >
                     {uploaded.status}
                   </Typography>
-                  {uploaded?.expiryDate && (
-                    <Typography variant="caption" color={getDeadlineColor(uploaded.expiryDate)}>
-                      Vence: {new Date(uploaded.expiryDate).toLocaleDateString()}
+                  {uploaded?.expirationDate && (
+                    <Typography variant="caption" color={getDeadlineColor(uploaded.expirationDate)}>
+                      Vence: {new Date(uploaded.expirationDate).toLocaleDateString()}
                     </Typography>
                   )}
                   {uploaded.status === "Rechazado" && (

@@ -16,20 +16,20 @@ import {
 } from "@mui/material";
 
 export default function AprobarDocumentoDialog({ open, onClose, documentData, onApproved }) {
-  const [expiryDate, setExpiryDate] = useState("");
+  const [expirationDate, setExpirationDate] = useState("");
   const [loading, setLoading] = useState(false);
 
   if (!documentData) return null;
 
   const handleApprove = async () => {
-    if (!expiryDate) return;
+    if (!expirationDate) return;
 
     setLoading(true);
     try {
       const docRef = doc(db, "uploadedDocuments", documentData.id);
       await updateDoc(docRef, {
         status: "Aprobado",
-        expiryDate,
+        expirationDate,
         reviewedAt: serverTimestamp(),
       });
       if (onApproved) {
@@ -60,8 +60,8 @@ export default function AprobarDocumentoDialog({ open, onClose, documentData, on
             type="date"
             fullWidth
             InputLabelProps={{ shrink: true }}
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
+            value={expirationDate}
+            onChange={(e) => setExpirationDate(e.target.value)}
           />
         </Box>
       </DialogContent>
@@ -71,7 +71,7 @@ export default function AprobarDocumentoDialog({ open, onClose, documentData, on
           variant="contained"
           color="success"
           onClick={handleApprove}
-          disabled={!expiryDate || loading}
+          disabled={!expirationDate || loading}
         >
           {loading ? <CircularProgress size={24} /> : "Confirmar Aprobación"}
         </Button>

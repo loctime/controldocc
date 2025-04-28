@@ -64,9 +64,9 @@ export default function AdminDocumentApprovalPage() {
           snapshot.docs.map((d) => ({
             id: d.id,
             ...d.data(),
-            daysRemaining: d.data().expiryDate
+            daysRemaining: d.data().expirationDate
               ? Math.ceil(
-                  (new Date(d.data().expiryDate) - new Date()) /
+                  (new Date(d.data().expirationDate) - new Date()) /
                     (1000 * 60 * 60 * 24)
                 )
               : null,
