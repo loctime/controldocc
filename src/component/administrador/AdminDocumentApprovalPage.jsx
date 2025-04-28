@@ -1,13 +1,15 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
+import AprobarDocumentoDialog from "./AprobarDocumentoDialog";
 import {
   collection,
   getDocs,
   updateDoc,
   doc,
   query,
-  where
+  where,
 } from "firebase/firestore";
 import {
   Box,
@@ -30,14 +32,14 @@ import {
   Tooltip,
   IconButton,
   Badge,
-  useTheme
+  useTheme,
 } from "@mui/material";
 import {
   CheckCircle,
   Cancel,
   Visibility,
   Download,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
 } from "@mui/icons-material";
 
 export default function AdminDocumentApprovalPage() {
@@ -45,6 +47,8 @@ export default function AdminDocumentApprovalPage() {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
+  const [openAprobarDialog, setOpenAprobarDialog] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const theme = useTheme();
 
   useEffect(() => {
@@ -65,7 +69,7 @@ export default function AdminDocumentApprovalPage() {
                   (new Date(d.data().expiryDate) - new Date()) /
                     (1000 * 60 * 60 * 24)
                 )
-              : null
+              : null,
           }))
         );
       } finally {
@@ -76,20 +80,12 @@ export default function AdminDocumentApprovalPage() {
     fetchPendingDocs();
   }, []);
 
-  const handleApprove = async (docId) => {
-    await updateDoc(doc(db, "uploadedDocuments", docId), {
-      status: "Aprobado",
-      reviewedAt: new Date().toISOString()
-    });
-    setDocuments((docs) => docs.filter((d) => d.id !== docId));
-  };
-
   const handleReject = async () => {
     if (!selectedDoc) return;
     await updateDoc(doc(db, "uploadedDocuments", selectedDoc.id), {
       status: "Rechazado",
       adminComment: comment,
-      reviewedAt: new Date().toISOString()
+      reviewedAt: new Date().toISOString(),
     });
     setDocuments((docs) => docs.filter((d) => d.id !== selectedDoc.id));
     setSelectedDoc(null);
@@ -135,47 +131,55 @@ export default function AdminDocumentApprovalPage() {
                         {doc.daysRemaining !== null && (
                           <Chip
                             label={`${doc.daysRemaining}d`}
-          color={
-            doc.daysRemaining <= 0
-              ? "error"
-              : doc.daysRemaining <= 7
-              ? "warning"
-              : "success"
-          }
-          size="small"
-        />
-      )}
-    </Box>
-  }
-/>
-
+                            color={
+                              doc.daysRemaining <= 0
+                                ? "error"
+                                : doc.daysRemaining <= 7
+                                ? "warning"
+                                : "success"
+                            }
+                            size="small"
+                          />
+                        )}
+                      </Box>
+                    }
                     secondary={
                       <>
                         <Typography variant="body2">
                           {doc.entityName} • {doc.companyName}
                         </Typography>
                         <Typography variant="caption">
-                          Subido: {new Date(doc.uploadedAt?.seconds * 1000).toLocaleDateString()}
+                          Subido:{" "}
+                          {new Date(
+                            doc.uploadedAt?.seconds * 1000
+                          ).toLocaleDateString()}
                         </Typography>
                       </>
                     }
+                  />
                   <Box display="flex" gap={1}>
                     <Tooltip title="Previsualizar">
-                      <IconButton onClick={() => window.open(doc.fileURL, '_blank')}>
+                      <IconButton
+                        onClick={() => window.open(doc.fileURL, "_blank")}
+                      >
                         <Visibility />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Descargar">
-                      <IconButton onClick={() => window.open(doc.fileURL, '_download')}>
+                      <IconButton
+                        onClick={() => window.open(doc.fileURL, "_blank")}
+                      >
                         <Download />
                       </IconButton>
                     </Tooltip>
                     <Button
-                      startIcon={<CheckCircle />}
-                      onClick={() => handleApprove(doc.id)}
                       variant="contained"
                       color="success"
                       size="small"
+                      onClick={() => {
+                        setSelectedDocument(doc);
+                        setOpenAprobarDialog(true);
+                      }}
                     >
                       Aprobar
                     </Button>
@@ -197,6 +201,7 @@ export default function AdminDocumentApprovalPage() {
         </Paper>
       )}
 
+      {/* Diálogo de Rechazo */}
       <Dialog open={!!selectedDoc} onClose={() => setSelectedDoc(null)}>
         <DialogTitle>Rechazar Documento</DialogTitle>
         <DialogContent>
@@ -216,6 +221,21 @@ export default function AdminDocumentApprovalPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Diálogo de Aprobación */}
+      {selectedDocument && (
+        <AprobarDocumentoDialog
+          open={openAprobarDialog}
+          onClose={() => {
+            setOpenAprobarDialog(false);
+            setSelectedDocument(null);
+          }}
+          documentData={selectedDocument}
+          onApproved={(approvedDocId) => {
+            setDocuments((docs) => docs.filter((d) => d.id !== approvedDocId));
+          }}
+        />
+      )}
     </Box>
   );
 }
