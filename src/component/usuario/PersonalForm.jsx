@@ -1,7 +1,6 @@
-import React, { useState, useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
+import React, { useState } from "react";
 import { db } from "../../firebaseconfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Box,
   Typography,
@@ -16,34 +15,43 @@ import {
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 const PersonalForm = () => {
-  const { user } = useContext(AuthContext);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [dni, setDni] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  
-  // Obtener información de la empresa desde localStorage (como backup)
+
   const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
-  // Usar companyId del contexto de autenticación o del localStorage como respaldo
-  const companyId = user?.companyId || userCompanyData?.companyId;
+  const companyId = userCompanyData?.companyId;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!nombre.trim() || !apellido.trim() || !dni.trim()) {
       setError("Por favor completa los campos obligatorios");
       return;
     }
-    
+
+    if (!companyId) {
+      setError("Error: No se pudo identificar la empresa. Cierre sesión y vuelva a ingresar.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      // Verificar que exista un companyId válido
-      if (!companyId) {
-        setError("Error: No se pudo identificar la empresa. Por favor, cierre sesión y vuelva a ingresar.");
+      // 🔥 Verificar si ya existe un DNI igual en esta empresa
+      const dniQuery = query(
+        collection(db, "personal"),
+        where("dni", "==", dni.trim()),
+        where("companyId", "==", companyId)
+      );
+      const existingDniSnap = await getDocs(dniQuery);
+
+      if (!existingDniSnap.empty) {
+        setError("Ya existe un empleado registrado con ese DNI.");
         setLoading(false);
         return;
       }
@@ -52,19 +60,15 @@ const PersonalForm = () => {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim(),
-        companyId: companyId,
+        companyId,
         createdAt: serverTimestamp(),
       };
 
-      console.log("Guardando personal con companyId:", companyId);
       await addDoc(collection(db, "personal"), nuevoPersonal);
-      
-      // Limpiar formulario
+
       setNombre("");
       setApellido("");
       setDni("");
-      
-      // Mostrar mensaje de éxito
       setSuccess(true);
     } catch (err) {
       console.error("Error al agregar personal:", err);
@@ -83,13 +87,13 @@ const PersonalForm = () => {
       <Typography variant="h6" gutterBottom>
         Agregar Nuevo Personal
       </Typography>
-      
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      
+
       <Box component="form" onSubmit={handleSubmit}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
@@ -99,7 +103,6 @@ const PersonalForm = () => {
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -109,7 +112,6 @@ const PersonalForm = () => {
               value={apellido}
               onChange={(e) => setApellido(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -119,42 +121,33 @@ const PersonalForm = () => {
               value={dni}
               onChange={(e) => setDni(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12}>
             <Button
               type="submit"
               variant="contained"
+              startIcon={<PersonAddIcon />}
               disabled={loading}
               sx={{ mt: 2 }}
+              fullWidth
             >
-              {loading ? (
-                <CircularProgress size={24} />
-              ) : (
-                <>
-                  <PersonAddIcon style={{ marginRight: '8px' }} />
-                  Agregar Personal
-                </>
-              )}
+              {loading ? <CircularProgress size={24} /> : "Agregar Personal"}
             </Button>
           </Grid>
         </Grid>
       </Box>
-      
-      {/* Usar un enfoque condicional para el Snackbar para evitar problemas de montaje/desmontaje */}
-      {success && (
-        <Snackbar
-          open={true}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert onClose={handleCloseSnackbar} severity="success">
-            Personal agregado exitosamente
-          </Alert>
-        </Snackbar>
-      )}
+
+      <Snackbar
+        open={success}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success">
+          Personal agregado exitosamente
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };

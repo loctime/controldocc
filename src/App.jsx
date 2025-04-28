@@ -1,12 +1,15 @@
 import { AuthProvider } from "./context/AuthContext";
 import AppRouter from "./router/AppRouter";
 import "./App.css";
+import { CompanyListProvider } from "./contextos/company-list-context";
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRouter />
-    </AuthProvider>
+    <CompanyListProvider>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </CompanyListProvider>
   );
 }
 

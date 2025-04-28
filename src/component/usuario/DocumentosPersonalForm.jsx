@@ -1,522 +1,287 @@
+// DocumentosPersonalForm.jsx mejorado final
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebaseconfig";
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  Grid,
-  Alert,
-  Snackbar,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField
+  Paper, Typography, Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Tooltip, CircularProgress
 } from "@mui/material";
 import {
   UploadFile as UploadFileIcon,
   Description as DescriptionIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Delete as DeleteIcon,
-  HourglassEmpty as HourglassEmptyIcon,
-  Info as InfoIcon
+  CloudUpload as CloudUploadIcon
 } from "@mui/icons-material";
+import { db } from "../../firebaseconfig";
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 
-const DocumentosPersonalForm = ({ persona }) => {
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+export default function DocumentosPersonalForm({ persona, selectedDocumentId = null,onDocumentUploaded = null }) {
+  const [currentStep, setCurrentStep] = useState("select");
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
-  const [selectedDocument, setSelectedDocument] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const [file, setFile] = useState(null);
   const [comment, setComment] = useState("");
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewType, setPreviewType] = useState("");
+  const [uploading, setUploading] = useState(false);
 
-  // Obtener información de la empresa desde localStorage
-  const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
+  const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
 
   useEffect(() => {
     if (!companyId || !persona) return;
-    
-    const fetchRequiredDocuments = async () => {
-      setLoading(true);
-      try {
-        // Obtener documentos requeridos para esta empresa que sean específicamente para empleados
-        const docsQuery = query(
-          collection(db, "requiredDocuments"),
-          where("companyId", "==", companyId),
-          where("entityType", "==", "employee")
-        );
-        
-        const docsSnapshot = await getDocs(docsQuery);
-        const docsList = docsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setRequiredDocuments(docsList);
-        
-        // Obtener documentos ya subidos para esta persona
-        const uploadedDocsQuery = query(
-          collection(db, "uploadedDocuments"),
-          where("companyId", "==", companyId),
-          where("entityType", "==", "employee"),
-          where("entityId", "==", persona.id)
-        );
-        
-        const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
-        const uploadedDocsList = uploadedDocsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setUploadedDocuments(uploadedDocsList);
-      } catch (err) {
-        console.error("Error al cargar documentos:", err);
-        setError("Error al cargar los documentos requeridos.");
-      } finally {
-        setLoading(false);
-      }
+  
+    const fetchDocuments = async () => {
+      const requiredSnap = await getDocs(query(
+        collection(db, "requiredDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "employee")
+      ));
+      const uploadedSnap = await getDocs(query(
+        collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "employee"),
+        where("entityId", "==", persona.id)
+      ));
+  
+      setRequiredDocuments(requiredSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setUploadedDocuments(uploadedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
-    
-    fetchRequiredDocuments();
+  
+    fetchDocuments();
   }, [companyId, persona]);
-
-  const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setFile(e.target.files[0]);
+  
+  // 🔵 Y luego agregás este segundo useEffect nuevo:
+  useEffect(() => {
+    if (selectedDocumentId) {
+      setSelectedDocument(selectedDocumentId);
+      setCurrentStep("upload");
     }
-  };
-
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    
-    if (!selectedDocument || !file || !persona) {
-      setError("Por favor selecciona un documento y un archivo para subir.");
-      return;
-    }
-    
-    const selectedDocData = requiredDocuments.find(doc => doc.id === selectedDocument);
-    if (!selectedDocData) {
-      setError("Documento no encontrado.");
-      return;
-    }
-    
+  }, [selectedDocumentId]);
+  
+  const handleUpload = async () => {
+    if (!selectedDocument || !file) return;
     setUploading(true);
-    setError("");
-    
     try {
-      // Crear una referencia única para el archivo
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${companyId}_${selectedDocument}_personal_${persona.id}_${Date.now()}.${fileExt}`;
-    
-      // Preparar el archivo para subirlo vía tu backend (Backblaze)
       const formData = new FormData();
       formData.append("file", file);
-    
-      const response = await fetch("http://localhost:3000/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-    
-      if (!response.ok) {
-        throw new Error("Error al subir el archivo personal");
-      }
-    
-      const { url: downloadURL } = await response.json();
-    
-      // Guardar la referencia en Firestore
-      const docData = {
-        companyId,
-        requiredDocumentId: selectedDocument,
-        documentName: selectedDocData.name,
-        entityType: "employee",
-        entityId: persona.id,
-        entityName: `${persona.nombre} ${persona.apellido}`,
-        fileURL: downloadURL,
-        fileName,
-        fileType: fileExt,
-        fileSize: file.size,
-        uploadedAt: serverTimestamp(),
-        status: "Pendiente de revisión",
-        comment: comment || ""
-      };
-      
-      await addDoc(collection(db, "uploadedDocuments"), docData);
-      
-      // Limpiar el formulario
-      setFile(null);
-      setSelectedDocument("");
-      setComment("");
-      
-      // Actualizar la lista de documentos subidos
-      const newUploadedDoc = {
-        ...docData,
-        id: Date.now().toString() // ID temporal hasta que se recargue la página
-      };
-      
-      setUploadedDocuments(prev => [...prev, newUploadedDoc]);
-      
-      // Mostrar mensaje de éxito
-      setSuccess(true);
-      
-      // Resetear el input de archivo
-      const fileInput = document.getElementById(`document-personal-file-input-${persona.id}`);
-      if (fileInput) fileInput.value = "";
-    } catch (err) {
-      console.error("Error al subir documento:", err);
-      setError("Error al subir el documento. Intenta nuevamente.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDeleteDocument = async (docId) => {
-    if (!docId) return;
-    
-    if (confirm("¿Estás seguro de que deseas eliminar este documento? Esta acción no se puede deshacer.")) {
-      setLoading(true);
-      
-      try {
-        // Marcar el documento como eliminado en Firestore
-        const docRef = doc(db, "uploadedDocuments", docId);
+      const res = await fetch("http://localhost:3000/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload error");
+      const { url } = await res.json();
+  
+      const selectedDocData = requiredDocuments.find(d => d.id === selectedDocument);
+  
+      // Buscar si ya existe uno
+      const existingDoc = uploadedDocuments.find(
+        (doc) => doc.entityId === persona.id && doc.requiredDocumentId === selectedDocument
+      );
+  
+      if (existingDoc) {
+        // 🔵 Si ya existe, actualizarlo
+        const docRef = doc(db, "uploadedDocuments", existingDoc.id);
         await updateDoc(docRef, {
-          status: "Eliminado",
-          deletedAt: serverTimestamp()
+          fileURL: url,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          uploadedAt: serverTimestamp(),
+          status: "Pendiente de revisión",
+          comment: comment || "",
+        });
+      } else {
+        // 🔵 Si no existe, crear uno nuevo
+        await addDoc(collection(db, "uploadedDocuments"), {
+          companyId,
+          requiredDocumentId: selectedDocument,
+          documentName: selectedDocData?.name || "Documento",
+          entityType: "employee",
+          entityId: persona.id,
+          entityName: `${persona.nombre} ${persona.apellido}`,
+          fileURL: url,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          uploadedAt: serverTimestamp(),
+          status: "Pendiente de revisión",
+          comment: comment || "",
         });
         
-        // Actualizar la lista local
-        setUploadedDocuments(prev => 
-          prev.filter(doc => doc.id !== docId)
-        );
-      } catch (err) {
-        console.error("Error al eliminar documento:", err);
-        setError("Error al eliminar el documento.");
-      } finally {
-        setLoading(false);
       }
-    }
-  };
-
-  const handleCloseSnackbar = () => {
-    setSuccess(false);
-  };
-
-  // Verificar si un documento ya ha sido subido
-  const isDocumentUploaded = (docId) => {
-    return uploadedDocuments.some(doc => doc.requiredDocumentId === docId);
-  };
+      if (onDocumentUploaded) {
+        onDocumentUploaded(); // 🔥 Avisar que se subió un documento
+      }
+      // 🔥 Recargar los documentos subidos
+      const uploadedSnap = await getDocs(query(
+        collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "employee"),
+        where("entityId", "==", persona.id)
+      ));
+      setUploadedDocuments(uploadedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   
-  // Obtener el icono según el estado del documento
-  const getDocumentStatusIcon = (docId) => {
-    const doc = uploadedDocuments.find(doc => doc.requiredDocumentId === docId);
-    if (!doc) return <DescriptionIcon color="primary" />;
-    
-    switch(doc.status) {
-      case "Aprobado":
-        return <CheckCircleIcon color="success" />;
-      case "Rechazado":
-        return <ErrorIcon color="error" />;
-      case "Pendiente de revisión":
-      default:
-        return <HourglassEmptyIcon color="warning" />;
+      resetForm();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUploading(false);
+      setConfirmDialogOpen(false);
     }
   };
   
-  // Obtener el texto de estado del documento
-  const getDocumentStatusText = (docId) => {
-    const doc = uploadedDocuments.find(doc => doc.requiredDocumentId === docId);
-    if (!doc) return "Pendiente";
-    
-    let statusText = doc.status;
-    
-    // Si tiene comentario del administrador, mostrarlo
-    if (doc.adminComment) {
-      statusText += ` - ${doc.adminComment}`;
-    }
-    
-    return statusText;
+
+  const resetForm = () => {
+    setFile(null);
+    setComment("");
+    setSelectedDocument(null);
+    setCurrentStep("select");
+  };
+
+  const openPreview = (url, type) => {
+    setPreviewUrl(url);
+    setPreviewType(type);
+    setPreviewOpen(true);
+  };
+
+  const getDocStatus = (docId) => uploadedDocuments.find(d => d.requiredDocumentId === docId);
+
+  const getDeadlineColor = (expiryDate) => {
+    if (!expiryDate) return "default";
+    const diff = (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+    if (diff <= 0) return "error.light";
+    if (diff <= 2) return "error.main";
+    if (diff <= 5) return "error";
+    if (diff <= 15) return "warning";
+    if (diff <= 30) return "info";
+    return "success";
   };
 
   if (!persona) return null;
 
   return (
-    <>
-      <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Documentos de {persona.nombre} {persona.apellido}
-        </Typography>
-        
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Cada empleado debe tener todos los documentos requeridos subidos individualmente. 
-          Los documentos marcados como pendientes deben ser subidos para este empleado.
-        </Alert>
-        
-        {requiredDocuments.length === 0 ? (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            No hay documentos requeridos para los empleados. El administrador debe configurar los documentos requeridos.
-          </Alert>
-        ) : (
-          <>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-            
-            <Box component="form" onSubmit={handleUpload}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Selecciona un documento para subir:
-                  </Typography>
-                  <List>
-                    {requiredDocuments.map((doc) => (
-                      <ListItem 
-                        key={doc.id}
-                        component="button"
-                        selected={selectedDocument === doc.id}
-                        onClick={() => setSelectedDocument(doc.id)}
-                        disabled={(isDocumentUploaded(doc.id) && getDocumentStatusText(doc.id) !== "Rechazado") || uploading}
-                        sx={{
-                          border: '1px solid #e0e0e0',
-                          borderRadius: '4px',
-                          mb: 1,
-                          bgcolor: isDocumentUploaded(doc.id) 
-                            ? getDocumentStatusText(doc.id).includes("Aprobado") 
-                              ? 'rgba(76, 175, 80, 0.1)' 
-                              : getDocumentStatusText(doc.id).includes("Rechazado")
-                                ? 'rgba(244, 67, 54, 0.1)'
-                                : 'rgba(255, 152, 0, 0.1)'
-                            : 'transparent'
-                        }}
-                      >
-                        <ListItemIcon>
-                          {isDocumentUploaded(doc.id) ? (
-                            getDocumentStatusIcon(doc.id)
-                          ) : (
-                            <DescriptionIcon color="error" />
-                          )}
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={<>
-                            <Typography component="span" variant="subtitle1">
-                              {doc.documentName}
-                            </Typography>
-                            {!isDocumentUploaded(doc.id) && (
-                              <Typography component="span" variant="caption" sx={{ ml: 1, color: 'error.main', fontWeight: 'bold' }}>
-                                (REQUERIDO)
-                              </Typography>
-                            )}
-                          </>} 
-                          secondary={<>
-                            {isDocumentUploaded(doc.id) 
-                              ? getDocumentStatusText(doc.id) 
-                              : "Pendiente - Este documento debe ser subido para este empleado"}
-                            {doc.exampleImage && (
-                              <Box mt={1}>
-                                <Typography variant="caption" display="block">Ejemplo:</Typography>
-                                <img 
-                                  src={doc.exampleImage} 
-                                  alt={`Ejemplo de ${doc.documentName}`} 
-                                  style={{ maxWidth: '100%', maxHeight: 150, border: '1px solid #e0e0e0', borderRadius: 4 }} 
-                                />
-                              </Box>
-                            )}
-                          </>}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Grid>
-                
-                {selectedDocument && (
-                  <>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Comentario (opcional)"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        disabled={uploading}
-                        multiline
-                        rows={2}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                      <Button
-                        variant="contained"
-                        component="label"
-                        startIcon={<UploadFileIcon />}
-                        disabled={uploading}
-                        sx={{ mr: 2 }}
-                      >
-                        Seleccionar Archivo
-                        <input
-                          id={`document-personal-file-input-${persona.id}`}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                          hidden
-                          onChange={handleFileChange}
-                        />
-                      </Button>
-                      
-                      {file && (
-                        <Typography variant="body2" component="span">
-                          {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </Typography>
-                      )}
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        color="primary"
-                        disabled={uploading || !selectedDocument || !file}
-                        startIcon={uploading ? <CircularProgress size={24} /> : <UploadFileIcon />}
-                      >
-                        {uploading ? "Subiendo..." : "Subir Documento"}
-                      </Button>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-            </Box>
-          </>
-        )}
-      </Paper>
-      
-      {uploadedDocuments.length > 0 && (
-        <Paper elevation={2} sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Documentos Subidos
-          </Typography>
-          
-          {loading ? (
-            <Box display="flex" justifyContent="center" p={3}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <List>
-              {uploadedDocuments.map((doc) => (
-                <React.Fragment key={doc.id}>
-                  <ListItem>
-                    <ListItemIcon>
-                      <DescriptionIcon color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-  primary={doc.documentName}
-  secondaryTypographyProps={{ component: "div" }}
-  secondary={
-    <>
-      <Typography
-        variant="body2"
-        component="div"
-        sx={{
-          color:
-            doc.status === "Aprobado"
-              ? "success.main"
-              : doc.status === "Rechazado"
-              ? "error.main"
-              : "warning.main",
-          fontWeight: "bold"
-        }}
-      >
-        Estado: {doc.status}
-      </Typography>
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h5" mb={2}>Documentos de {persona.nombre} {persona.apellido}</Typography>
 
-      <Typography variant="body2" component="div">
-        Subido: {doc.uploadedAt ? new Date(doc.uploadedAt.seconds * 1000).toLocaleString() : "Recién subido"}
-      </Typography>
-
-      {doc.comment && (
-        <Typography variant="body2" component="div">
-          Comentario: {doc.comment}
-        </Typography>
-      )}
-
-      {doc.adminComment && (
-        <Typography variant="body2" component="div" sx={{ fontWeight: "bold" }}>
-          Comentario del revisor: {doc.adminComment}
-        </Typography>
-      )}
-
-      {doc.status === "Rechazado" && (
-        <Typography variant="body2" component="div" color="error">
-          <InfoIcon fontSize="small" sx={{ verticalAlign: "middle", mr: 0.5 }} />
-          Debe volver a subir este documento
-        </Typography>
-      )}
-
-      {doc.exampleImage && (
+      {currentStep === "select" && (
         <>
-          <Typography variant="caption" component="div">
-            Ejemplo:
-          </Typography>
-          <img
-            src={doc.exampleImage}
-            alt={`Ejemplo de ${doc.documentName}`}
-            style={{
-              maxWidth: "100%",
-              maxHeight: 150,
-              display: "block",
-              marginTop: 4,
-              border: "1px solid #e0e0e0",
-              borderRadius: 4
-            }}
-          />
+          <Grid container spacing={2}>
+            {requiredDocuments.map(doc => {
+              const status = getDocStatus(doc.id);
+              const vencimientoColor = getDeadlineColor(status?.expiryDate);
+              const canUpload = !status || status.status === "Rechazado";
+              return (
+                <Grid item xs={12} sm={6} md={4} key={doc.id}>
+                  <Paper
+                    sx={{ p: 2, cursor: canUpload ? "pointer" : "default", border: selectedDocument === doc.id ? "2px solid #1976d2" : "1px solid #ccc" }}
+                    onClick={() => canUpload && setSelectedDocument(doc.id)}
+                  >
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Typography fontWeight="bold">{doc.name}</Typography>
+                      {status?.status && (
+                        <Chip size="small" label={status.status} color={status.status === "Aprobado" ? "success" : status.status === "Rechazado" ? "error" : "warning"} />
+                      )}
+                    </Box>
+                    {status?.expiryDate && (
+                      <Typography variant="body2" color={vencimientoColor} mt={1}>
+                        Vence: {new Date(status.expiryDate).toLocaleDateString()}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+
+          <Box mt={3} display="flex" justifyContent="flex-end">
+            <Button variant="contained" onClick={() => setCurrentStep("upload")} disabled={!selectedDocument}>
+              Siguiente
+            </Button>
+          </Box>
         </>
       )}
-    </>
-  }
-/>
 
-                    <ListItemSecondaryAction>
-                      <IconButton 
-                        edge="end" 
-                        aria-label="delete"
-                        onClick={() => handleDeleteDocument(doc.id)}
-                        disabled={loading}
-                      >
-                        <DeleteIcon color="error" />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
-          )}
-        </Paper>
+      {currentStep === "upload" && selectedDocument && (
+        <Box>
+          <Button variant="outlined" onClick={() => setCurrentStep("select")} sx={{ mb: 2 }}>
+            Volver
+          </Button>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2 }}>
+                <Typography variant="h6">Ejemplo</Typography>
+                <Box
+                  sx={{ border: '2px dashed #ccc', borderRadius: 2, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => {
+                    const doc = requiredDocuments.find(d => d.id === selectedDocument);
+                    if (doc?.exampleImage) openPreview(doc.exampleImage, 'image');
+                  }}
+                >
+                  {requiredDocuments.find(d => d.id === selectedDocument)?.exampleImage ? (
+                    <img src={requiredDocuments.find(d => d.id === selectedDocument).exampleImage} alt="Ejemplo" style={{ maxWidth: '90%', maxHeight: '90%' }} />
+                  ) : (
+                    <Typography color="text.secondary">Sin ejemplo disponible</Typography>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2 }}>
+                <Typography variant="h6">Archivo Seleccionado</Typography>
+                <Box
+                  sx={{ border: '2px dashed #ccc', borderRadius: 2, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: file ? 'pointer' : 'default' }}
+                  onClick={() => file && openPreview(URL.createObjectURL(file), file.type.startsWith('image/') ? 'image' : 'pdf')}
+                >
+                  {file ? (
+                    file.type.startsWith('image/') ? (
+                      <img src={URL.createObjectURL(file)} alt="Archivo" style={{ maxWidth: '90%', maxHeight: '90%' }} />
+                    ) : (
+                      <Typography>Vista previa disponible</Typography>
+                    )
+                  ) : (
+                    <Typography color="text.secondary">No seleccionado</Typography>
+                  )}
+                </Box>
+
+                <Box mt={2}>
+                  <Button variant="contained" component="label" startIcon={<UploadFileIcon />}>
+                    Seleccionar Archivo
+                    <input type="file" hidden onChange={(e) => e.target.files[0] && setFile(e.target.files[0])} />
+                  </Button>
+                  <TextField label="Comentario" value={comment} onChange={e => setComment(e.target.value)} fullWidth sx={{ mt: 2 }} />
+                </Box>
+
+                <Box mt={2}>
+                  <Button variant="contained" fullWidth disabled={!file} onClick={() => setConfirmDialogOpen(true)}>
+                    Confirmar
+                  </Button>
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
       )}
-      
-      <Snackbar
-        open={success}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity="success">
-          Documento subido exitosamente
-        </Alert>
-      </Snackbar>
-    </>
-  );
-};
 
-export default DocumentosPersonalForm;
+      <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)}>
+        <DialogTitle>Confirmar subida</DialogTitle>
+        <DialogContent><Typography>¿Subir documento?</Typography></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleUpload} disabled={uploading}>
+            {uploading ? <CircularProgress size={24} /> : "Subir"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <Box p={2}>
+          {previewType === "image" ? (
+            <img src={previewUrl} alt="Preview" style={{ width: '100%', height: 'auto' }} />
+          ) : previewType === "pdf" ? (
+            <iframe src={previewUrl} title="Vista PDF" width="100%" height="600px" style={{ border: 'none' }} />
+          ) : (
+            <Typography>No disponible</Typography>
+          )}
+        </Box>
+      </Dialog>
+    </Paper>
+  );
+}

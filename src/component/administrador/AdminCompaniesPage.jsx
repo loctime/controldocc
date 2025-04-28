@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { db } from "../../firebaseconfig";
-import { collection, getDocs, deleteDoc, doc, query, where, setDoc, addDoc } from "firebase/firestore";
+import { collection, getDoc, getDocs, deleteDoc, doc, query, where, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { useCompanyList } from "../../contextos/company-list-context";
 import {
   Box,
   Typography,
@@ -26,11 +27,13 @@ import {
   InputLabel,
   OutlinedInput,
   InputAdornment,
-  FormHelperText
+  FormHelperText,
+  Snackbar
 } from "@mui/material";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   Business as BusinessIcon,
   Visibility,
   VisibilityOff
@@ -41,54 +44,49 @@ const Transition = React.forwardRef(function Transition(props, ref) {
 });
 
 export default function AdminCompaniesPage() {
-  const [companies, setCompanies] = useState([]);
+  const { companies, fetchCompanies, loading, error } = useCompanyList();
+  
+  // 🔵 Estados para crear empresa
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyCuit, setNewCompanyCuit] = useState("");
   const [newCompanyPassword, setNewCompanyPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  // 🔵 Estados para eliminar empresa
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState(null);
 
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  // 🔵 Estados para editar empresa
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [companyToEdit, setCompanyToEdit] = useState(null);
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editCompanyPassword, setEditCompanyPassword] = useState("");
 
-  const loadCompanies = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const snapshot = await getDocs(collection(db, "companies"));
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setCompanies(list);
-    } catch (error) {
-      console.error("Error loading companies:", error);
-      setError("Error al cargar las empresas. Por favor, intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 🔵 Snackbar
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const handleCreateCompany = async (event) => {
     event.preventDefault();
     if (!newCompanyName.trim() || !newCompanyCuit.trim() || !newCompanyPassword.trim()) return;
 
-    setLoading(true);
-    setError("");
     try {
-      // Crear la empresa
+      const existingCompany = await getDoc(doc(db, "companies", newCompanyCuit.trim()));
+      if (existingCompany.exists()) {
+        setSnackbar({ open: true, message: "Ya existe una empresa con ese CUIT.", severity: "warning" });
+        return;
+      }
+
+      // Crear empresa
       const newCompany = {
         name: newCompanyName.trim(),
         cuit: newCompanyCuit.trim(),
         createdAt: new Date().toISOString(),
       };
       
-      // Usar el CUIT como ID de la empresa
       const companyRef = doc(db, "companies", newCompanyCuit.trim());
       await setDoc(companyRef, newCompany);
-      
-      // Crear un usuario predeterminado para esta empresa
+
+      // Crear usuario predeterminado
       const defaultUserEmail = `${newCompanyCuit.trim()}@controldoc.com`;
       const defaultUser = {
         email: defaultUserEmail,
@@ -96,94 +94,101 @@ export default function AdminCompaniesPage() {
         companyId: newCompanyCuit.trim(),
         name: newCompanyName.trim(),
         createdAt: new Date().toISOString(),
-        password: newCompanyPassword.trim(), // Almacenar la contraseña para referencia
+        password: newCompanyPassword.trim(),
       };
       
-      // Crear un documento en la colección users con un ID generado automáticamente
       await addDoc(collection(db, "users"), defaultUser);
-      
-      // Limpiar el formulario
+
       setNewCompanyName("");
       setNewCompanyCuit("");
       setNewCompanyPassword("");
-      
-      // Recargar la lista de empresas
-      await loadCompanies();
+
+      await fetchCompanies();
+      setSnackbar({ open: true, message: "Empresa creada exitosamente.", severity: "success" });
+
     } catch (error) {
       console.error("Error creating company:", error);
-      setError("Error al crear la empresa. Por favor, intenta de nuevo.");
-      setLoading(false);
+      setSnackbar({ open: true, message: "Error al crear la empresa.", severity: "error" });
     }
   };
 
-  // Función para abrir el diálogo de confirmación
   const openDeleteConfirmation = (company) => {
-    // Guardamos una copia local de la empresa para evitar problemas de referencia
-    setCompanyToDelete({...company});
+    setCompanyToDelete({ ...company });
     setOpenDeleteDialog(true);
   };
 
-  // Función para cerrar el diálogo sin eliminar
-  const handleCloseDialog = () => {
+  const handleCloseDeleteDialog = () => {
     setOpenDeleteDialog(false);
-    // Esperamos a que se complete la animación de cierre antes de limpiar el estado
-    setTimeout(() => {
-      setCompanyToDelete(null);
-    }, 300); // 300ms es aproximadamente la duración de la animación de Material UI
+    setTimeout(() => setCompanyToDelete(null), 300);
   };
 
-  // Función para eliminar la empresa
   const handleDeleteCompany = async () => {
     if (!companyToDelete) return;
 
-    // Guardamos los datos necesarios en variables locales
     const cuitToDelete = companyToDelete.cuit;
-    
-    // Cerramos el diálogo primero
     setOpenDeleteDialog(false);
-    
-    // Esperamos a que se complete la animación de cierre
+
     setTimeout(async () => {
       try {
-        setLoading(true);
-        setError("");
-        
-        // Actualizamos el estado local primero (optimistic update)
-        setCompanies((prevCompanies) =>
-          prevCompanies.filter((company) => company.cuit !== cuitToDelete)
-        );
-        
-        // Eliminamos la empresa de Firestore
         await deleteDoc(doc(db, "companies", cuitToDelete));
-        
-        // Buscamos y eliminamos los usuarios asociados
+
         const usersQuery = await getDocs(
           query(collection(db, "users"), where("companyId", "==", cuitToDelete))
         );
-        
         const deletePromises = [];
         usersQuery.forEach((userDoc) => {
           deletePromises.push(deleteDoc(doc(db, "users", userDoc.id)));
         });
-        
-        if (deletePromises.length > 0) {
-          await Promise.all(deletePromises);
-        }
-        
-        // Limpiamos la referencia a la empresa eliminada
-        setCompanyToDelete(null);
-        
-        // Recargamos las empresas para asegurar sincronización
-        await loadCompanies();
+        if (deletePromises.length > 0) await Promise.all(deletePromises);
+
+        await fetchCompanies();
+        setSnackbar({ open: true, message: "Empresa eliminada exitosamente.", severity: "success" });
       } catch (error) {
         console.error("Error deleting company:", error);
-        setError("Error al eliminar la empresa. Por favor, intenta de nuevo.");
-        // Recargamos las empresas para restaurar el estado correcto
-        await loadCompanies();
-      } finally {
-        setLoading(false);
+        setSnackbar({ open: true, message: "Error al eliminar la empresa.", severity: "error" });
       }
-    }, 300); // Esperamos a que se complete la animación
+    }, 300);
+  };
+
+  const openEditCompanyDialog = (company) => {
+    setCompanyToEdit({ ...company });
+    setEditCompanyName(company.name);
+    setEditCompanyPassword(""); // ⚡ opcional: podrías no editar contraseña si no quieres
+    setOpenEditDialog(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setOpenEditDialog(false);
+    setTimeout(() => setCompanyToEdit(null), 300);
+  };
+
+  const handleUpdateCompany = async () => {
+    if (!companyToEdit) return;
+
+    try {
+      const companyRef = doc(db, "companies", companyToEdit.cuit);
+      await updateDoc(companyRef, {
+        name: editCompanyName.trim(),
+      });
+
+      if (editCompanyPassword.trim()) {
+        const usersQuery = await getDocs(
+          query(collection(db, "users"), where("companyId", "==", companyToEdit.cuit))
+        );
+        const updatePromises = [];
+        usersQuery.forEach((userDoc) => {
+          updatePromises.push(updateDoc(doc(db, "users", userDoc.id), { password: editCompanyPassword.trim() }));
+        });
+        if (updatePromises.length > 0) await Promise.all(updatePromises);
+      }
+
+      await fetchCompanies();
+      setSnackbar({ open: true, message: "Empresa actualizada exitosamente.", severity: "success" });
+      handleCloseEditDialog();
+    } catch (error) {
+      console.error("Error updating company:", error);
+      setSnackbar({ open: true, message: "Error al actualizar la empresa.", severity: "error" });
+    }
   };
 
   return (
@@ -208,7 +213,6 @@ export default function AdminCompaniesPage() {
             variant="outlined"
             value={newCompanyName}
             onChange={(e) => setNewCompanyName(e.target.value)}
-            disabled={loading}
             fullWidth
             required
           />
@@ -217,7 +221,6 @@ export default function AdminCompaniesPage() {
             variant="outlined"
             value={newCompanyCuit}
             onChange={(e) => setNewCompanyCuit(e.target.value)}
-            disabled={loading}
             fullWidth
             required
             helperText="Este CUIT se usará para iniciar sesión"
@@ -248,7 +251,7 @@ export default function AdminCompaniesPage() {
             variant="contained" 
             startIcon={<AddIcon />}
             type="submit"
-            disabled={loading || !newCompanyName.trim() || !newCompanyCuit.trim() || !newCompanyPassword.trim()}
+            disabled={!newCompanyName.trim() || !newCompanyCuit.trim() || !newCompanyPassword.trim()}
           >
             Crear Empresa
           </Button>
@@ -276,10 +279,19 @@ export default function AdminCompaniesPage() {
                     CUIT: {company.cuit || "-"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Creada: {new Date(company.createdAt).toLocaleDateString()}
+                    Creada: {company.createdAt ? new Date(company.createdAt).toLocaleDateString() : "-"}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'flex-end', p: 2 }}>
+                  <Tooltip title="Editar empresa">
+                    <IconButton 
+                      color="primary" 
+                      size="small"
+                      onClick={() => openEditCompanyDialog(company)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Eliminar empresa">
                     <IconButton 
                       color="error" 
@@ -296,13 +308,12 @@ export default function AdminCompaniesPage() {
         </Grid>
       )}
 
+      {/* Diálogo de eliminar empresa */}
       <Dialog
         open={openDeleteDialog}
         TransitionComponent={Transition}
         keepMounted
-        onClose={handleCloseDialog}
-        aria-labelledby="alert-dialog-slide-title"
-        aria-describedby="alert-dialog-slide-description"
+        onClose={handleCloseDeleteDialog}
       >
         {companyToDelete && (
           <>
@@ -313,7 +324,7 @@ export default function AdminCompaniesPage() {
               </DialogContentText>
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleCloseDialog} color="primary">
+              <Button onClick={handleCloseDeleteDialog} color="primary">
                 Cancelar
               </Button>
               <Button onClick={handleDeleteCompany} color="error" variant="contained">
@@ -323,6 +334,48 @@ export default function AdminCompaniesPage() {
           </>
         )}
       </Dialog>
+
+      {/* Diálogo de editar empresa */}
+      <Dialog
+        open={openEditDialog}
+        TransitionComponent={Transition}
+        keepMounted
+        onClose={handleCloseEditDialog}
+      >
+        <DialogTitle>Editar Empresa</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1, px: 3, pb: 3 }}>
+          <TextField
+            label="Nuevo nombre de empresa"
+            value={editCompanyName}
+            onChange={(e) => setEditCompanyName(e.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Nueva contraseña (opcional)"
+            type="password"
+            value={editCompanyPassword}
+            onChange={(e) => setEditCompanyPassword(e.target.value)}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog} color="primary">
+            Cancelar
+          </Button>
+          <Button onClick={handleUpdateCompany} color="success" variant="contained">
+            Guardar cambios
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      />
     </Box>
   );
 }

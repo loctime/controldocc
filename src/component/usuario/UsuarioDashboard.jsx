@@ -24,8 +24,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Badge
+  Badge,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Tooltip
 } from "@mui/material";
+
 import DescriptionIcon from "@mui/icons-material/Description";
 import PersonIcon from "@mui/icons-material/Person";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
@@ -41,7 +49,8 @@ import PersonalImportForm from "./PersonalImportForm";
 
 const UsuarioDashboard = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
-
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null);
+  
   const { user } = useContext(AuthContext);
   const [company, setCompany] = useState(null);
   const [requiredDocuments, setRequiredDocuments] = useState([]);
@@ -97,17 +106,18 @@ const UsuarioDashboard = () => {
         }));
 
         setRequiredDocuments(docsList);
-// Cargar documentos subidos
-const uploadedDocsQuery = query(
-  collection(db, "uploadedDocuments"),
-  where("companyId", "==", companyId)
-);
-const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
-const uploadedDocsList = uploadedDocsSnapshot.docs.map((doc) => ({
-  id: doc.id,
-  ...doc.data(),
-}));
-setUploadedDocuments(uploadedDocsList);
+
+        // Cargar documentos subidos
+        const uploadedDocsQuery = query(
+          collection(db, "uploadedDocuments"),
+          where("companyId", "==", companyId)
+        );
+        const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
+        const uploadedDocsList = uploadedDocsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUploadedDocuments(uploadedDocsList);
 
         // Cargar personal
         const personalQuery = query(
@@ -147,6 +157,17 @@ setUploadedDocuments(uploadedDocsList);
     fetchCompanyAndDocuments();
   }, []);
 
+  const getDeadlineColor = (expiryDate) => {
+    if (!expiryDate) return "textSecondary";
+    const diff = (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
+    if (diff <= 0) return "error.main";
+    if (diff <= 2) return "error.dark";
+    if (diff <= 5) return "warning.main";
+    if (diff <= 15) return "warning.light";
+    if (diff <= 30) return "info.main";
+    return "success.main";
+  };
+  
   const hasWarningsForType = (type) => {
     const requiredForType = requiredDocuments.filter(doc => doc.entityType === type);
     return requiredForType.some(doc => {
@@ -173,6 +194,23 @@ setUploadedDocuments(uploadedDocsList);
   };
   
 
+  const refreshUploadedDocuments = async () => {
+    const userCompanyData = JSON.parse(localStorage.getItem('userCompany'));
+    if (!userCompanyData?.companyId) return;
+    
+    const uploadedDocsQuery = query(
+      collection(db, "uploadedDocuments"),
+      where("companyId", "==", userCompanyData.companyId)
+    );
+    const uploadedDocsSnapshot = await getDocs(uploadedDocsQuery);
+    const uploadedDocsList = uploadedDocsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  
+    setUploadedDocuments(uploadedDocsList);
+  };
+  
 
   if (error) {
     return (
@@ -425,37 +463,144 @@ setUploadedDocuments(uploadedDocsList);
                 No hay personal registrado para esta empresa.
               </Typography>
             ) : (
-              <Grid container spacing={2}>
-                {personal.map((persona) => (
-                  <Grid item xs={12} sm={6} md={4} key={persona.id}>
-                    <Paper elevation={1} sx={{ p: 2 }}>
-                    <Badge color="error" variant="dot" invisible={!hasWarningsForPerson(persona.id)}>
-  <Typography variant="subtitle1" fontWeight="bold">
-    {persona.nombre} {persona.apellido}
-  </Typography>
-</Badge>
+              <TableContainer component={Paper}>
+  <Table>
+    <TableHead>
+      <TableRow>
+        <TableCell><b>Nombre</b></TableCell>
+        <TableCell><b>DNI</b></TableCell>
+        {[...requiredDocuments]
+          .filter(doc => doc.entityType === "employee")
+          .sort((a, b) => {
+            const dateA = a.dueDate ? new Date(a.dueDate) : new Date(8640000000000000);
+            const dateB = b.dueDate ? new Date(b.dueDate) : new Date(8640000000000000);
+            return dateA - dateB;
+          })
+          .slice(0, 5)
+          .map((doc) => (
+            <TableCell key={doc.id}><b>{doc.name}</b></TableCell>
+          ))}
+        <TableCell><b>Ver Más</b></TableCell> {/* Columna final siempre */}
+      </TableRow>
+    </TableHead>
+    <TableBody>
+      {personal.map((persona) => (
+        <TableRow
+          key={persona.id}
+          sx={{
+            "&:hover": {
+              backgroundColor: "action.hover",
+              cursor: "pointer"
+            }
+          }}
+        >
+          <TableCell>{persona.nombre} {persona.apellido}</TableCell>
+          <TableCell>{persona.dni}</TableCell>
 
-                      <Typography variant="body2">
-                        DNI: {persona.dni}
-                      </Typography>
-                      <Button 
-                        variant="outlined" 
-                        color="primary"
-                        startIcon={<UploadFileIcon />}
-                        onClick={() => {
-                          setSelectedPersona(persona);
-                          setOpenDocumentosDialog(true);
-                        }}
-                        fullWidth
-                        sx={{ mt: 2 }}
+          {[...requiredDocuments]
+            .filter(doc => doc.entityType === "employee")
+            .sort((a, b) => {
+              const dateA = a.dueDate ? new Date(a.dueDate) : new Date(8640000000000000);
+              const dateB = b.dueDate ? new Date(b.dueDate) : new Date(8640000000000000);
+              return dateA - dateB;
+            })
+            .slice(0, 5)
+            .map((doc) => {
+              const uploaded = uploadedDocuments.find(
+                up => up.entityId === persona.id && up.requiredDocumentId === doc.id
+              );
+              const color = uploaded?.expiryDate ? getDeadlineColor(uploaded.expiryDate) : "textSecondary";
+              const vencimientoFecha = uploaded?.expiryDate ? new Date(uploaded.expiryDate).toLocaleDateString() : null;
+
+              return (
+                <TableCell key={doc.id}>
+                  {uploaded ? (
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "start", gap: 0.5 }}>
+                      <Typography
+                        color={
+                          uploaded.status === "Aprobado" ? "success.main"
+                          : uploaded.status === "Rechazado" ? "error.main"
+                          : "warning.main"
+                        }
+                        variant="body2"
                       >
-                        Documentos
-                      </Button>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+                        {uploaded.status}
+                      </Typography>
+                      {uploaded?.expiryDate && (
+                        <Typography variant="caption" color={getDeadlineColor(uploaded.expiryDate)}>
+                          Vence: {new Date(uploaded.expiryDate).toLocaleDateString()}
+                        </Typography>
+                      )}
+                      {uploaded.status === "Rechazado" && (
+                        <Tooltip title="Subir documento corregido" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => {
+                              setSelectedPersona(persona);
+                              setSelectedDocumentId(doc.id);
+                              setOpenDocumentosDialog(true);
+                            }}
+                          >
+                            Subir nuevamente
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "start", gap: 0.5 }}>
+                      <Tooltip title="Subir documento faltante" arrow>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            setSelectedPersona(persona);
+                            setSelectedDocumentId(doc.id);
+                            setOpenDocumentosDialog(true);
+                          }}
+                        >
+                          Subir
+                        </Button>
+                      </Tooltip>
+                      {vencimientoFecha && (
+                        <Typography variant="caption" color="warning.main">
+                          Vence: {vencimientoFecha}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </TableCell>
+              );
+            })
+          }
+
+          {/* Celda botón Ver Más */}
+          <TableCell>
+            <Tooltip title="Ver todos los documentos" arrow>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  setSelectedPersona(persona);
+                  setSelectedDocumentId(null);
+                  setOpenDocumentosDialog(true);
+                }}
+              >
+                Ver Más
+              </Button>
+            </Tooltip>
+          </TableCell>
+
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+</TableContainer>
+
+
+)}
+
           </Paper>
           
           {/* Diálogo para documentos de personal */}
@@ -472,7 +617,13 @@ setUploadedDocuments(uploadedDocsList);
               Documentos de {selectedPersona?.nombre} {selectedPersona?.apellido}
             </DialogTitle>
             <DialogContent dividers>
-              {selectedPersona && <DocumentosPersonalForm persona={selectedPersona} />}
+            {selectedPersona && (
+  <DocumentosPersonalForm
+    persona={selectedPersona}
+    selectedDocumentId={selectedDocumentId}
+    onDocumentUploaded={refreshUploadedDocuments}
+  />
+)}
             </DialogContent>
             <DialogActions>
               <Button 
@@ -492,49 +643,153 @@ setUploadedDocuments(uploadedDocsList);
       {tabValue === 2 && (
         <>
           <VehiculosForm />
-          
           <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Vehículos Registrados
-            </Typography>
+  <Typography variant="h6" gutterBottom>
+    Vehículos Registrados ({vehiculos.length})
+  </Typography>
 
-            {vehiculos.length === 0 ? (
-              <Typography color="textSecondary">
-                No hay vehículos registrados para esta empresa.
-              </Typography>
-            ) : (
-              <Grid container spacing={2}>
-                {vehiculos.map((vehiculo) => (
-                  <Grid item xs={12} sm={6} md={4} key={vehiculo.id}>
-                    <Paper elevation={1} sx={{ p: 2 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {vehiculo.marca} {vehiculo.modelo}
-                      </Typography>
-                      <Typography variant="body2">
-                        Patente: {vehiculo.patente}
-                      </Typography>
-                      <Typography variant="body2">
-                        Tipo: {vehiculo.tipo} {vehiculo.año ? `| Año: ${vehiculo.año}` : ''}
-                      </Typography>
-                      <Button 
-                        variant="outlined" 
-                        color="primary"
-                        startIcon={<UploadFileIcon />}
+  {vehiculos.length === 0 ? (
+    <Typography color="textSecondary">
+      No hay vehículos registrados para esta empresa.
+    </Typography>
+  ) : (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell><b>Patente</b></TableCell>
+            <TableCell><b>Modelo</b></TableCell>
+            {[...requiredDocuments]
+              .filter(doc => doc.entityType === "vehicle")
+              .sort((a, b) => {
+                const dateA = a.dueDate ? new Date(a.dueDate) : new Date(8640000000000000);
+                const dateB = b.dueDate ? new Date(b.dueDate) : new Date(8640000000000000);
+                return dateA - dateB;
+              })
+              .slice(0, 5)
+              .map((doc) => (
+                <TableCell key={doc.id}><b>{doc.name}</b></TableCell>
+              ))}
+            <TableCell><b>Ver Más</b></TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+  {vehiculos.map((vehiculo) => (
+    <TableRow
+      key={vehiculo.id}
+      sx={{
+        "&:hover": {
+          backgroundColor: "action.hover",
+          cursor: "pointer"
+        }
+      }}
+    >
+      <TableCell>{vehiculo.patente}</TableCell>
+      <TableCell>{vehiculo.modelo}</TableCell>
+
+      {[...requiredDocuments]
+        .filter(doc => doc.entityType === "vehicle")
+        .sort((a, b) => {
+          const dateA = a.dueDate ? new Date(a.dueDate) : new Date(8640000000000000);
+          const dateB = b.dueDate ? new Date(b.dueDate) : new Date(8640000000000000);
+          return dateA - dateB;
+        })
+        .slice(0, 5)
+        .map((doc) => {
+          const uploaded = uploadedDocuments.find(
+            up => up.entityId === vehiculo.id && up.requiredDocumentId === doc.id
+          );
+          const color = uploaded?.expiryDate ? getDeadlineColor(uploaded.expiryDate) : "textSecondary";
+          const vencimientoFecha = uploaded?.expiryDate ? new Date(uploaded.expiryDate).toLocaleDateString() : null;
+
+          return (
+            <TableCell key={doc.id}>
+              {uploaded ? (
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "start", gap: 0.5 }}>
+                  <Typography
+                    color={
+                      uploaded.status === "Aprobado" ? "success.main"
+                      : uploaded.status === "Rechazado" ? "error.main"
+                      : "warning.main"
+                    }
+                    variant="body2"
+                  >
+                    {uploaded.status}
+                  </Typography>
+                  {uploaded?.expiryDate && (
+                    <Typography variant="caption" color={getDeadlineColor(uploaded.expiryDate)}>
+                      Vence: {new Date(uploaded.expiryDate).toLocaleDateString()}
+                    </Typography>
+                  )}
+                  {uploaded.status === "Rechazado" && (
+                    <Tooltip title="Subir documento corregido" arrow>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
                         onClick={() => {
                           setSelectedVehiculo(vehiculo);
+                          setSelectedDocumentId(doc.id);
                           setOpenDocumentosDialog(true);
                         }}
-                        fullWidth
-                        sx={{ mt: 2 }}
                       >
-                        Documentos
+                        Subir nuevamente
                       </Button>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </Paper>
+                    </Tooltip>
+                  )}
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "start", gap: 0.5 }}>
+                  <Tooltip title="Subir documento faltante" arrow>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setSelectedVehiculo(vehiculo);
+                        setSelectedDocumentId(doc.id);
+                        setOpenDocumentosDialog(true);
+                      }}
+                    >
+                      Subir
+                    </Button>
+                  </Tooltip>
+                  {vencimientoFecha && (
+                    <Typography variant="caption" color="warning.main">
+                      Vence: {vencimientoFecha}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </TableCell>
+          );
+        })
+      }
+
+      {/* Botón Ver más */}
+      <TableCell>
+        <Tooltip title="Ver todos los documentos" arrow>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSelectedVehiculo(vehiculo);
+              setSelectedDocumentId(null);
+              setOpenDocumentosDialog(true);
+            }}
+          >
+            Ver Más
+          </Button>
+        </Tooltip>
+      </TableCell>
+
+    </TableRow>
+  ))}
+</TableBody>
+        </Table>
+      </TableContainer>
+    )}
+  </Paper>
+          
           
           {/* Diálogo para documentos de vehículos */}
           <Dialog 
@@ -550,8 +805,14 @@ setUploadedDocuments(uploadedDocsList);
               Documentos de {selectedVehiculo?.marca} {selectedVehiculo?.modelo} ({selectedVehiculo?.patente})
             </DialogTitle>
             <DialogContent dividers>
-              {selectedVehiculo && <DocumentosVehiculoForm vehiculo={selectedVehiculo} />}
-            </DialogContent>
+  {selectedVehiculo && (
+    <DocumentosVehiculoForm
+      vehiculo={selectedVehiculo}
+      selectedDocumentId={selectedDocumentId}
+      onDocumentUploaded={refreshUploadedDocuments}
+    />
+  )}
+</DialogContent>
             <DialogActions>
               <Button 
                 onClick={() => {

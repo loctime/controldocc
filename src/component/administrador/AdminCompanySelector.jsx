@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../../firebaseconfig';
-import { collection, getDocs } from 'firebase/firestore';
-import { useCompany } from '../../contexts/company-context';
+import React from 'react';
+import { useCompany } from '../../contextos/company-context';
+import { useCompanyList } from '../../contextos/company-list-context';
 import {
   Box,
   FormControl,
@@ -16,35 +15,8 @@ import {
 import BusinessIcon from '@mui/icons-material/Business';
 
 const AdminCompanySelector = () => {
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { companies, loading, error } = useCompanyList();
   const { selectedCompanyId, selectCompany } = useCompany();
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      setLoading(true);
-      try {
-        const snapshot = await getDocs(collection(db, 'companies'));
-        const companiesList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        // Ordenar alfabéticamente por nombre
-        companiesList.sort((a, b) => a.name.localeCompare(b.name));
-        
-        setCompanies(companiesList);
-      } catch (err) {
-        console.error('Error al cargar empresas:', err);
-        setError('Error al cargar la lista de empresas.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCompanies();
-  }, []);
 
   const handleCompanyChange = (event) => {
     const companyId = event.target.value;
@@ -52,7 +24,7 @@ const AdminCompanySelector = () => {
       selectCompany(null, '');
       return;
     }
-    
+
     const selectedCompany = companies.find(company => company.id === companyId);
     if (selectedCompany) {
       selectCompany(companyId, selectedCompany.name);
@@ -65,13 +37,13 @@ const AdminCompanySelector = () => {
         <BusinessIcon sx={{ mr: 1 }} />
         Seleccionar Empresa
       </Typography>
-      
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
           <CircularProgress size={24} />

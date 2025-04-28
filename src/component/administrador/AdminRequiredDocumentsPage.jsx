@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompany } from "../../contexts/company-context";
-import { uploadFile } from "../../services/backblazeService.js";
 import {
   Box,
   Typography,
@@ -48,16 +47,19 @@ export default function AdminRequiredDocumentsPage() {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [deleteDialogState, setDeleteDialogState] = useState({
-    open: false,
-    documentId: null
-  });
+  const [deleteDialogState, setDeleteDialogState] = useState({ open: false, documentId: null });
   const [exampleImage, setExampleImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { selectedCompanyId } = useCompany();
   const theme = useTheme();
+
+  const [validationErrors, setValidationErrors] = useState({
+    name: '',
+    entityType: '',
+    deadline: ''
+  });
 
   useEffect(() => {
     if (selectedCompanyId) {
@@ -88,9 +90,19 @@ export default function AdminRequiredDocumentsPage() {
     }
   };
 
+  const validateForm = () => {
+    const errors = {
+      name: !newDocName.trim() ? 'El nombre es requerido' : '',
+      entityType: !entityType ? 'Selecciona un tipo' : '',
+      deadline: deadlineType === 'custom' && !date ? 'Fecha requerida' : ''
+    };
+    setValidationErrors(errors);
+    return !Object.values(errors).some(error => error);
+  };
+
   const handleCreateDocument = async (event) => {
-    if (event) event.preventDefault();
-    if (!newDocName.trim() || !selectedCompanyId) return;
+    event.preventDefault();
+    if (!validateForm()) return;
 
     setLoading(true);
     setError("");
@@ -100,24 +112,21 @@ export default function AdminRequiredDocumentsPage() {
       if (deadlineType === "biannual") deadline.months = months;
       if (deadlineType === "custom") deadline.date = date;
 
-      let exampleImageUrl = exampleImage;
-      if (exampleImage && typeof exampleImage !== 'string') {
-        const formData = new FormData();
-        formData.append("file", exampleImage);
-        formData.append("folder", "documentExamples");
-
-        const res = await fetch("http://localhost:3000/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-  if (!res.ok) throw new Error("Error al subir la imagen de ejemplo");
-
-  const data = await res.json();
-  exampleImageUrl = data.url;
-}
-
-
+      let exampleImageUrl = "";
+      if (exampleImage) {
+        if (typeof exampleImage !== "string") {
+          // Sube nueva imagen
+          const formData = new FormData();
+          formData.append("file", exampleImage);
+          formData.append("folder", "documentExamples");
+          const res = await fetch("http://localhost:3000/api/upload", { method: "POST", body: formData });
+          const data = await res.json();
+          exampleImageUrl = data.url;
+        } else {
+          // Usa URL existente
+          exampleImageUrl = exampleImage;
+        }
+      }
       const newDocument = {
         name: newDocName.trim(),
         entityType,
@@ -129,6 +138,8 @@ export default function AdminRequiredDocumentsPage() {
       };
 
       await addDoc(collection(db, "requiredDocuments"), newDocument);
+
+      // Limpiar formulario
       setNewDocName("");
       setEntityType("company");
       setDeadlineType("monthly");
@@ -137,7 +148,8 @@ export default function AdminRequiredDocumentsPage() {
       setDate("");
       setExampleImage(null);
       setImagePreview("");
-      loadDocuments();
+
+      await loadDocuments();
     } catch (error) {
       console.error("Error creating document:", error);
       setError("Error al crear el documento.");
@@ -149,22 +161,22 @@ export default function AdminRequiredDocumentsPage() {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-  
+
     try {
       setIsUploadingImage(true);
-  
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", "documentExamples");
-  
+
       const res = await fetch("http://localhost:3000/api/upload", {
         method: "POST",
         body: formData,
       });
-  
+
       const data = await res.json();
       if (res.ok) {
-        setExampleImage(data.downloadUrl); // o como lo devuelva tu backend
+        setExampleImage(data.url);
         setImagePreview(URL.createObjectURL(file));
       } else {
         throw new Error(data.message || "Upload failed");

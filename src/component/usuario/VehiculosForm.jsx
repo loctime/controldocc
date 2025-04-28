@@ -1,7 +1,6 @@
-import React, { useState, useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
+import React, { useState } from "react";
 import { db } from "../../firebaseconfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Box,
   Typography,
@@ -11,30 +10,32 @@ import {
   Grid,
   Alert,
   Snackbar,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   CircularProgress
 } from "@mui/material";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 
 const VehiculosForm = () => {
-  const { user } = useContext(AuthContext);
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [patente, setPatente] = useState("");
   const [año, setAño] = useState("");
-  const [tipo, setTipo] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!marca.trim() || !modelo.trim() || !patente.trim() || !tipo.trim()) {
+
+    if (!marca.trim() || !modelo.trim() || !patente.trim()) {
       setError("Por favor completa los campos obligatorios");
+      return;
+    }
+
+    const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
+    const companyId = userCompanyData?.companyId;
+
+    if (!companyId) {
+      setError("No tienes empresa asociada. No se puede agregar vehículo.");
       return;
     }
 
@@ -42,26 +43,36 @@ const VehiculosForm = () => {
     setError("");
 
     try {
+      // 🔥 Verificar si ya existe la patente
+      const patenteQuery = query(
+        collection(db, "vehiculos"),
+        where("patente", "==", patente.trim()),
+        where("companyId", "==", companyId)
+      );
+      const existingPatenteSnap = await getDocs(patenteQuery);
+
+      if (!existingPatenteSnap.empty) {
+        setError("Ya existe un vehículo registrado con esa patente.");
+        setLoading(false);
+        return;
+      }
+
       const nuevoVehiculo = {
         marca: marca.trim(),
         modelo: modelo.trim(),
         patente: patente.trim(),
-        año: año.trim(),
-        tipo: tipo.trim(),
-        companyId: user.companyId,
+        año: año.trim() || null,
+        companyId,
         createdAt: serverTimestamp(),
       };
 
       await addDoc(collection(db, "vehiculos"), nuevoVehiculo);
-      
-      // Limpiar formulario
+
       setMarca("");
       setModelo("");
       setPatente("");
       setAño("");
-      setTipo("");
-      
-      // Mostrar mensaje de éxito
+
       setSuccess(true);
     } catch (err) {
       console.error("Error al agregar vehículo:", err);
@@ -80,13 +91,13 @@ const VehiculosForm = () => {
       <Typography variant="h6" gutterBottom>
         Agregar Nuevo Vehículo
       </Typography>
-      
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      
+
       <Box component="form" onSubmit={handleSubmit}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
@@ -96,7 +107,6 @@ const VehiculosForm = () => {
               value={marca}
               onChange={(e) => setMarca(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -106,7 +116,6 @@ const VehiculosForm = () => {
               value={modelo}
               onChange={(e) => setModelo(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -116,7 +125,6 @@ const VehiculosForm = () => {
               value={patente}
               onChange={(e) => setPatente(e.target.value)}
               disabled={loading}
-              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -127,8 +135,10 @@ const VehiculosForm = () => {
               onChange={(e) => setAño(e.target.value)}
               disabled={loading}
               type="number"
+              inputProps={{ min: 1900, max: new Date().getFullYear() }}
             />
           </Grid>
+
           <Grid item xs={12}>
             <Button
               type="submit"
@@ -136,13 +146,14 @@ const VehiculosForm = () => {
               startIcon={<DirectionsCarIcon />}
               disabled={loading}
               sx={{ mt: 2 }}
+              fullWidth
             >
               {loading ? <CircularProgress size={24} /> : "Agregar Vehículo"}
             </Button>
           </Grid>
         </Grid>
       </Box>
-      
+
       <Snackbar
         open={success}
         autoHideDuration={6000}

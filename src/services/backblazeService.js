@@ -1,13 +1,19 @@
 import axios from 'axios';
+/*
+ * DEBUG_MODE: 
+ * - true: Muestra logs detallados (entorno desarrollo)
+ * - false: Solo errores críticos (entorno producción)
+ */
+const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
 let authData = null;
 
 export async function initB2() {
   try {
-    console.log('Using B2 Key:', process.env.B2_KEY_ID);
-    console.log('Bucket ID:', process.env.B2_BUCKET_ID);
-    console.log('Application Key:', process.env.B2_APPLICATION_KEY?.substring(0, 6) + '...');
-    console.log('[B2 DEBUG] Env:', {
+    DEBUG_MODE && console.log('Using B2 Key:', process.env.B2_KEY_ID);
+    DEBUG_MODE && console.log('Bucket ID:', process.env.B2_BUCKET_ID);
+    DEBUG_MODE && console.log('Application Key:', process.env.B2_APPLICATION_KEY?.substring(0, 6) + '...');
+    DEBUG_MODE && console.log('[B2 DEBUG] Env:', {
       key: process.env.B2_KEY_ID,
       bucketId: process.env.B2_BUCKET_ID
     });
@@ -19,15 +25,16 @@ export async function initB2() {
     });
     
     authData = response.data;
-    console.log('Auth Data:', authData); 
+    DEBUG_MODE && console.log('Auth Data:', authData);
     return authData;
   } catch (error) {
-    console.error('Error initializing B2:', error.response?.data || error.message);
+    DEBUG_MODE && console.error('Error initializing B2:', error.response?.data || error.message);
     throw error;
   }
 
 }
 
+// backblazeService.js (modificación en la función uploadFile)
 export async function uploadFile(fileBuffer, fileName, mimeType, sha1 = 'do_not_verify') {
   try {
     if (!authData) await initB2();
@@ -35,7 +42,7 @@ export async function uploadFile(fileBuffer, fileName, mimeType, sha1 = 'do_not_
     // Validar sha1 o usar valor por defecto
     if (!sha1 || typeof sha1 !== 'string') {
       sha1 = 'do_not_verify';
-      console.warn('No se proporcionó SHA1 válido, usando "do_not_verify"');
+      DEBUG_MODE && console.warn('No se proporcionó SHA1 válido, usando "do_not_verify"');
     }
     
     // Obtener URL de subida
@@ -58,10 +65,12 @@ export async function uploadFile(fileBuffer, fileName, mimeType, sha1 = 'do_not_
       }
     });
 
-    // URL de descarga corregida
-    return `${authData.downloadUrl}/b2api/v1/b2_download_file_by_name?bucketName=${process.env.B2_BUCKET_NAME}&fileName=${encodeURIComponent(fileName)}`;
+    // URL de descarga CORREGIDA (usando formato público)
+    const bucketName = process.env.B2_BUCKET_NAME || 'controldocc';
+    const encodedFileName = encodeURIComponent(fileName).replace(/%2F/g, '/');
+    return `https://${authData.downloadUrl.split('/')[2]}/file/${bucketName}/${encodedFileName}`;
   } catch (error) {
-    console.error('Error uploading file:', {
+    DEBUG_MODE && console.error('Error uploading file:', {
       status: error.response?.status,
       data: error.response?.data,
       message: error.message
