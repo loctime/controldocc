@@ -166,7 +166,7 @@ export default function AdminRequiredDocumentsPage() {
       setIsUploadingImage(true);
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", file, file.name);
       formData.append("folder", "documentExamples");
 
       const res = await fetch("http://localhost:3000/api/upload", {

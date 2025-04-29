@@ -1,72 +1,93 @@
-// backblazeService.js (modificado correctamente)
-
 import axios from 'axios';
+import crypto from 'crypto';
 
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
-
 let authData = null;
 
 export async function initB2() {
-  try {
-    DEBUG_MODE && console.log('Using B2 Key:', process.env.B2_KEY_ID);
+  if (!authData) {
+    const basicAuth = Buffer.from(`${process.env.B2_KEY_ID}:${process.env.B2_APPLICATION_KEY}`).toString('base64');
     const response = await axios.get('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-      auth: {
-        username: process.env.B2_KEY_ID,
-        password: process.env.B2_APPLICATION_KEY
-      }
+      headers: { Authorization: `Basic ${basicAuth}` }
     });
     authData = response.data;
-    return authData;
-  } catch (error) {
-    DEBUG_MODE && console.error('Error initializing B2:', error.response?.data || error.message);
-    throw error;
   }
+  return authData;
 }
 
-export async function uploadFile(fileBuffer, fileName, mimeType, sha1 = 'do_not_verify') {
+export async function uploadFile(fileBuffer, mimeType, sha1 = 'do_not_verify') {
   try {
     if (!authData) await initB2();
-    
-    if (!sha1 || typeof sha1 !== 'string') {
-      sha1 = 'do_not_verify';
-    }
-    
-    // Obtener URL de subida
-    const uploadResponse = await axios.post(
+
+    const extension = guessExtension(mimeType);
+    const randomName = generateSafeFileName(extension);
+    const finalPath = `documentExamples/${randomName}`.replace(/\s/g, '_');
+
+    const uploadUrlResp = await axios.post(
       `${authData.apiUrl}/b2api/v2/b2_get_upload_url`,
       { bucketId: authData.allowed.bucketId },
       { headers: { Authorization: authData.authorizationToken } }
     );
-    
-    const { uploadUrl, authorizationToken } = uploadResponse.data;
-    
-    // Subir el archivo con Content-Disposition: attachment
-    const response = await axios.post(uploadUrl, fileBuffer, {
+
+    const { uploadUrl, authorizationToken } = uploadUrlResp.data;
+
+    if (DEBUG_MODE) {
+      console.log('DEBUG upload:', {
+        uploadUrl,
+        'X-Bz-File-Name': finalPath,
+        mimeType
+      });
+    }
+
+    const response = await axios({
+      method: 'post',
+      url: uploadUrl,
       headers: {
         Authorization: authorizationToken,
-        'X-Bz-File-Name': encodeURIComponent(fileName),
+        'X-Bz-File-Name': finalPath,
         'Content-Type': mimeType,
         'X-Bz-Content-Sha1': sha1,
-        'Content-Length': fileBuffer.length,
-        // 🔥 Agregamos esto
-        'X-Bz-Info-Content-Disposition': `attachment; filename="${fileName}"`
-      }
+      },
+      data: fileBuffer,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      transformRequest: [(data) => data],
     });
 
-    // URL pública corregida
     const bucketName = process.env.B2_BUCKET_NAME || 'controldocc';
-    const encodedFileName = encodeURIComponent(fileName).replace(/%2F/g, '/');
+    const downloadUrl = `https://${authData.downloadUrl.split('/')[2]}/file/${bucketName}/${finalPath}`;
 
     return {
-      url: `https://${authData.downloadUrl.split('/')[2]}/file/${bucketName}/${encodedFileName}`,  // 📄 URL pública
-      fileId: response.data.fileId,  // 🆔 ID único de Backblaze
+      url: downloadUrl,
+      fileId: response.data.fileId,
+      fileName: randomName,
     };
   } catch (error) {
     DEBUG_MODE && console.error('Error uploading file:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      stack: error.stack
     });
+
+    if (error.response?.data) {
+      throw new Error(`Backblaze error: ${error.response.data.code} - ${error.response.data.message}`);
+    }
     throw error;
+  }
+}
+
+function generateSafeFileName(extension) {
+  const random = crypto.randomBytes(8).toString('hex');
+  return `${Date.now()}_${random}${extension}`.replace(/\s/g, '_');
+}
+
+function guessExtension(mimeType) {
+  switch (mimeType) {
+    case 'image/jpeg': return '.jpg';
+    case 'image/png': return '.png';
+    case 'image/gif': return '.gif';
+    case 'application/pdf': return '.pdf';
+    default: return '';
   }
 }
