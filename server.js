@@ -37,5 +37,5 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 app.listen(port, () => {
-  console.log(`Servidor backend en http://localhost:${port}`);
+  console.log(`Servidor backend en el puerto ${port}`);
 });

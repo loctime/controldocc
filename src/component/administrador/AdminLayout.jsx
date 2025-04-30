@@ -132,17 +132,16 @@ export default function AdminLayout() {
   };
 
   // Función para cerrar sesión
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      // Cerrar el menú de perfil
-      handleProfileMenuClose();
-      // Redirigir al login
-      navigate('/login');
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    }
-  };
+const handleLogout = async () => {
+try {
+  await signOut(auth);
+  localStorage.removeItem('userCompany'); // 🔥 IMPORTANTE
+  handleProfileMenuClose();
+  navigate('/login');
+} catch (error) {
+  console.error('Error al cerrar sesión:', error);
+}
+};
 
   // Cargar las empresas
   useEffect(() => {

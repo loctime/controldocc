@@ -54,7 +54,7 @@ export default function DocumentosEmpresaForm() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("http://localhost:3000/api/upload", { method: "POST", body: formData });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, { method: "POST", body: formData });
       if (!response.ok) throw new Error("Error uploading file");
       const { url: downloadURL } = await response.json();
 

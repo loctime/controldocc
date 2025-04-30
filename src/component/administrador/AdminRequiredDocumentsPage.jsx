@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompany } from "../../contexts/company-context";
+import DocumentTemplateManager from "./DocumentTemplateManager";
+import ErrorBoundary from "../../components/common/ErrorBoundary";
 import {
   Box,
   Typography,
@@ -90,6 +92,36 @@ export default function AdminRequiredDocumentsPage() {
     }
   };
 
+  // Función para aplicar una plantilla de documentos a la empresa actual
+  const handleApplyTemplate = async (templateDocuments) => {
+    if (!selectedCompanyId || !templateDocuments || templateDocuments.length === 0) return;
+    
+    setLoading(true);
+    setError("");
+    
+    try {
+      // Crear cada documento de la plantilla en Firestore
+      const promises = templateDocuments.map(docTemplate => 
+        addDoc(collection(db, "requiredDocuments"), {
+          ...docTemplate,
+          companyId: selectedCompanyId,
+          createdAt: new Date().toISOString()
+        })
+      );
+      
+      await Promise.all(promises);
+      
+      // Recargar la lista de documentos
+      await loadDocuments();
+      
+    } catch (error) {
+      console.error("Error al aplicar plantilla:", error);
+      setError("Error al aplicar la plantilla de documentos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const validateForm = () => {
     const errors = {
       name: !newDocName.trim() ? 'El nombre es requerido' : '',
@@ -166,7 +198,7 @@ export default function AdminRequiredDocumentsPage() {
       setIsUploadingImage(true);
 
       const formData = new FormData();
-      formData.append("file", file, file.name);
+      formData.append("file", file);
       formData.append("folder", "documentExamples");
 
       const res = await fetch("http://localhost:3000/api/upload", {
@@ -338,39 +370,20 @@ export default function AdminRequiredDocumentsPage() {
               }}
               onPaste={handlePasteImage}
             >
-           {exampleImage && typeof exampleImage === 'string' ? (
-  exampleImage.endsWith(".pdf") ? (
-    <iframe
-      src={exampleImage}
-      style={{ width: '100%', height: 400, border: 'none' }}
-      title="Vista previa del PDF"
-    />
-  ) : exampleImage.endsWith(".doc") || exampleImage.endsWith(".docx") ? (
-    <Typography textAlign="center" color="text.secondary">
-      Documento Word cargado: {exampleImage.split("/").pop()}
-    </Typography>
-  ) : (
-    <img 
-      src={exampleImage} 
-      alt="Ejemplo de documento" 
-      style={{ maxWidth: '100%', maxHeight: 200 }} 
-    />
-  )
-) : imagePreview && typeof exampleImage !== 'string' ? (
-  <img 
-    src={imagePreview} 
-    alt="Ejemplo temporal" 
-    style={{ maxWidth: '100%', maxHeight: 200 }} 
-  />
-) : (
-  <Typography textAlign="center" color="text.secondary">
-    Pega una imagen aquí o sube un archivo (PDF, Word, imagen)
-  </Typography>
-)}
-
+              {imagePreview ? (
+                <img 
+                  src={imagePreview} 
+                  alt="Ejemplo de documento" 
+                  style={{ maxWidth: '100%', maxHeight: 200 }} 
+                />
+              ) : (
+                <Typography textAlign="center" color="text.secondary">
+                  Pega una imagen aquí o sube un archivo
+                </Typography>
+              )}
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                accept="image/*"
                 onChange={handleImageUpload}
                 style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                 disabled={isUploadingImage}
@@ -379,7 +392,7 @@ export default function AdminRequiredDocumentsPage() {
             {isUploadingImage && (
               <Box display="flex" alignItems="center" gap={1}>
                 <CircularProgress size={20} />
-                <Typography variant="caption">Subiendo ejemplo...</Typography>
+                <Typography variant="caption">Subiendo imagen...</Typography>
               </Box>
             )}
           </Box>
@@ -392,6 +405,20 @@ export default function AdminRequiredDocumentsPage() {
             Crear
           </Button>
         </Box>
+      </Paper>
+
+      {/* Gestor de plantillas de documentos */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Plantillas de documentos
+        </Typography>
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Guarde la lista actual de documentos como una plantilla para reutilizarla con otras empresas, o aplique una plantilla existente.
+        </Typography>
+        <DocumentTemplateManager 
+          onApplyTemplate={handleApplyTemplate} 
+          currentDocuments={documents} 
+        />
       </Paper>
 
       {/* Lista de documentos */}

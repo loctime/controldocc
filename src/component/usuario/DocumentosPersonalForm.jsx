@@ -64,7 +64,7 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("http://localhost:3000/api/upload", { method: "POST", body: formData });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, { method: "POST", body: formData });
       if (!res.ok) throw new Error("Upload error");
       const { url } = await res.json();
   
