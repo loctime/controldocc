@@ -151,7 +151,11 @@ export default function AdminRequiredDocumentsPage() {
           const formData = new FormData();
           formData.append("file", exampleImage);
           formData.append("folder", "documentExamples");
-          const res = await fetch("http://localhost:3000/api/upload", { method: "POST", body: formData });
+          const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+          const res = await fetch(`${apiUrl}/api/upload`, {
+            method: "POST",
+            body: formData,
+          });
           const data = await res.json();
           exampleImageUrl = data.url;
         } else {
@@ -201,11 +205,11 @@ export default function AdminRequiredDocumentsPage() {
       formData.append("file", file);
       formData.append("folder", "documentExamples");
 
-      const res = await fetch("http://localhost:3000/api/upload", {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const res = await fetch(`${apiUrl}/api/upload`, {
         method: "POST",
         body: formData,
       });
-
       const data = await res.json();
       if (res.ok) {
         setExampleImage(data.url);
