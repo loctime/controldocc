@@ -251,7 +251,6 @@ const UsuarioDashboard = () => {
           <Tab icon={<BusinessIcon />} label="EMPRESA" />
         </Tabs>
       </Box>
-
       {/* Panel de Documentos */}
       {tabValue === 0 && (
         <>
@@ -290,9 +289,7 @@ const UsuarioDashboard = () => {
       Ver Documentos
     </Button>
   </Paper>
-</Grid>
-
-                
+</Grid>      
                 {/* Documentos de Personal */}
                 <Grid xs={12} md={4}>
                   <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -350,7 +347,6 @@ const UsuarioDashboard = () => {
     </Button>
   </Paper>
 </Grid>
-
               </Grid>
             )}
           </Paper>
@@ -416,7 +412,6 @@ const UsuarioDashboard = () => {
     </>
   }
 />
-
                   </ListItem>
                   <Divider />
                 </React.Fragment>
@@ -597,10 +592,7 @@ const UsuarioDashboard = () => {
     </TableBody>
   </Table>
 </TableContainer>
-
-
 )}
-
           </Paper>
           
           {/* Diálogo para documentos de personal */}

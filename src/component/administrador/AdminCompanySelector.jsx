@@ -35,7 +35,7 @@ const AdminCompanySelector = () => {
     <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
         <BusinessIcon sx={{ mr: 1 }} />
-        Seleccionar Empresa
+        Todas las empresas
       </Typography>
 
       {error && (

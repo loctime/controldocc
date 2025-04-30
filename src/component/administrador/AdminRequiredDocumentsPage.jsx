@@ -338,20 +338,39 @@ export default function AdminRequiredDocumentsPage() {
               }}
               onPaste={handlePasteImage}
             >
-              {imagePreview ? (
-                <img 
-                  src={imagePreview} 
-                  alt="Ejemplo de documento" 
-                  style={{ maxWidth: '100%', maxHeight: 200 }} 
-                />
-              ) : (
-                <Typography textAlign="center" color="text.secondary">
-                  Pega una imagen aquí o sube un archivo
-                </Typography>
-              )}
+           {exampleImage && typeof exampleImage === 'string' ? (
+  exampleImage.endsWith(".pdf") ? (
+    <iframe
+      src={exampleImage}
+      style={{ width: '100%', height: 400, border: 'none' }}
+      title="Vista previa del PDF"
+    />
+  ) : exampleImage.endsWith(".doc") || exampleImage.endsWith(".docx") ? (
+    <Typography textAlign="center" color="text.secondary">
+      Documento Word cargado: {exampleImage.split("/").pop()}
+    </Typography>
+  ) : (
+    <img 
+      src={exampleImage} 
+      alt="Ejemplo de documento" 
+      style={{ maxWidth: '100%', maxHeight: 200 }} 
+    />
+  )
+) : imagePreview && typeof exampleImage !== 'string' ? (
+  <img 
+    src={imagePreview} 
+    alt="Ejemplo temporal" 
+    style={{ maxWidth: '100%', maxHeight: 200 }} 
+  />
+) : (
+  <Typography textAlign="center" color="text.secondary">
+    Pega una imagen aquí o sube un archivo (PDF, Word, imagen)
+  </Typography>
+)}
+
               <input
                 type="file"
-                accept="image/*"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                 onChange={handleImageUpload}
                 style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                 disabled={isUploadingImage}
@@ -360,7 +379,7 @@ export default function AdminRequiredDocumentsPage() {
             {isUploadingImage && (
               <Box display="flex" alignItems="center" gap={1}>
                 <CircularProgress size={20} />
-                <Typography variant="caption">Subiendo imagen...</Typography>
+                <Typography variant="caption">Subiendo ejemplo...</Typography>
               </Box>
             )}
           </Box>

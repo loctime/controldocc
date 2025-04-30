@@ -217,14 +217,19 @@ export default function AdminLayout() {
           <FormControl sx={{ minWidth: 200, mr: 'auto' }} size="small">
             <InputLabel id="company-select-label">Empresa</InputLabel>
             <Select
-              labelId="company-select-label"
-              value={selectedCompanyId || ''}
-              onChange={handleCompanyChange}
-              label="Empresa"
-              disabled={loadingCompanies}
-            >
+  labelId="company-select-label"
+  value={selectedCompanyId || ''}
+  onChange={handleCompanyChange}
+  label="Empresa"
+  disabled={loadingCompanies}
+  renderValue={(selected) => {
+    if (!selected) return 'Todas las empresas';
+    const company = companies.find(c => c.id === selected);
+    return company?.name || 'Empresa seleccionada';
+  }}
+>
               <MenuItem value="">
-                <em>Seleccionar empresa</em>
+                <em>Todas las empresas</em>
               </MenuItem>
               {companies.map((company) => (
                 <MenuItem key={company.id} value={company.id}>

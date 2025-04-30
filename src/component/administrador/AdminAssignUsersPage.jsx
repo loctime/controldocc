@@ -107,13 +107,16 @@ export default function AdminAssignUsersPage() {
 
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel id="company-select-label">Seleccionar Empresa</InputLabel>
+                <InputLabel id="company-select-label">Todas las empresas</InputLabel>
                 <Select
-                  labelId="company-select-label"
+                  labelId="company-select-label"  
                   value={selectedCompanyId}
                   onChange={(e) => setSelectedCompanyId(e.target.value)}
-                  label="Seleccionar Empresa"
+                  label="Todas las empresas"
                 >
+                  <MenuItem value="">
+                    <em>Todas las empresas</em>
+                  </MenuItem>
                   {companies.map((company) => (
                     <MenuItem key={company.id} value={company.id}>
                       {company.name}
