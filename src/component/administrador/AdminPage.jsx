@@ -3,7 +3,6 @@ import { CompanyProvider, CompanyContext } from '../../contexts/company-context'
 import AdminCompanySelector from './AdminCompanySelector';
 import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
-import AdminDocumentApprovalPage from './AdminDocumentApprovalPage.tsx';
 import AdminRequiredDocumentsPage from './AdminRequiredDocumentsPage';
 import { Box, Tabs, Tab, Typography, Paper } from '@mui/material';
 import TaskIcon from '@mui/icons-material/Task';
@@ -39,8 +38,6 @@ function AdminTabs() {
     { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
     { icon: <DescriptionIcon />, label: 'Documentos Subidos', content: <AdminUploadedDocumentsPage /> },
     { icon: <AssignmentTurnedInIcon />, label: 'Documentos Requeridos', content: <AdminRequiredDocumentsPage /> },
-    { icon: <AssignmentTurnedInIcon />, label: 'Aprobaciones', content: <AdminDocumentApprovalPage /> },
-    { icon: <TaskIcon />, label: 'Tareas', content: <AdminDocumentApprovalPage /> },
   ];
 
   const handleTabChange = (event, newValue) => {
