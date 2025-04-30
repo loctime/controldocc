@@ -5,15 +5,24 @@ import multer from 'multer';
 import { uploadFile } from './src/services/backblazeService.js';
 import { config } from 'dotenv';
 
+// Cargar variables de entorno desde .env
 config({ path: '.env' });
 
 const app = express();
 const upload = multer();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+// ✅ CORS: permitir solo desde tu dominio en Vercel
+app.use(cors({
+  origin: 'https://controldocc.vercel.app',
+  methods: ['GET', 'POST'],
+  credentials: false
+}));
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Ruta para subir archivos
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
@@ -28,6 +37,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       fileBuffer,
       req.file.mimetype
     );
+
     console.log('Nombre recibido:', req.file.originalname);
 
     res.json(uploadResult);
@@ -36,6 +46,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 app.listen(port, () => {
-  console.log(`Servidor backend en el puerto ${port}`);
+  console.log(`Servidor backend corriendo en puerto ${port}`);
 });
