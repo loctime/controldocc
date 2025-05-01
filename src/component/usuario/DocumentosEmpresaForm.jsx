@@ -1,423 +1,347 @@
-import React, { useState, useEffect } from "react";
-import { db } from "../../firebaseconfig";
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+// DocumentosEmpresaForm.jsx
+import React, { useEffect, useState } from "react";
 import {
-  Paper, Typography, Grid, Box, Button, TextField, Card, CardContent, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemIcon, ListItemText
+  Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
+  DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography
 } from "@mui/material";
-import { 
-  UploadFile as UploadFileIcon, 
-  EventNote as EventNoteIcon,
-  Image as ImageIcon,
-  CloudUpload as CloudUploadIcon,
-  Upload as UploadIcon,
+import {
   Description as DescriptionIcon,
-  Info as InfoIcon,
-  InsertDriveFile as InsertDriveFileIcon,
-  Storage as StorageIcon
+  UploadFile as UploadFileIcon,
+  CloudUpload as CloudUploadIcon,
+  Image as ImageIcon,
+  Warning as WarningIcon
 } from "@mui/icons-material";
+import { db } from "../../firebaseconfig";
+import {
+  collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp
+} from "firebase/firestore";
 
-export default function DocumentosEmpresaForm() {
-  const [currentStep, setCurrentStep] = useState("select");
+export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [file, setFile] = useState(null);
+ 
   const [comment, setComment] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [previewType, setPreviewType] = useState('');
-  
-  const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
+  const [fileMap, setFileMap] = useState({});
+  const [previewMap, setPreviewMap] = useState({});
+
+  const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
 
   useEffect(() => {
     if (!companyId) return;
     const fetchDocuments = async () => {
-      const requiredDocsQuery = query(collection(db, "requiredDocuments"), where("companyId", "==", companyId), where("entityType", "==", "company"));
-      const uploadedDocsQuery = query(collection(db, "uploadedDocuments"), where("companyId", "==", companyId), where("entityType", "==", "company"));
-      const [requiredSnap, uploadedSnap] = await Promise.all([getDocs(requiredDocsQuery), getDocs(uploadedDocsQuery)]);
-      setRequiredDocuments(requiredSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setUploadedDocuments(uploadedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const reqQuery = query(collection(db, "requiredDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "company"));
+      const upQuery = query(collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "company"));
+      const [reqSnap, upSnap] = await Promise.all([getDocs(reqQuery), getDocs(upQuery)]);
+      setRequiredDocuments(reqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setUploadedDocuments(upSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     };
     fetchDocuments();
-  }, [companyId]);
-
-  const handleFileChange = (e) => {
-    if (e.target.files[0]) setFile(e.target.files[0]);
-  };
+  }, [companyId, onDocumentUploaded]);
 
   const handleUpload = async () => {
-    if (!selectedDocument || !file) return;
+    if (!selectedDocument || !fileMap?.[selectedDocument?.id]) return;
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, { method: "POST", body: formData });
-      if (!response.ok) throw new Error("Error uploading file");
-      const { url: downloadURL } = await response.json();
+      formData.append("file", fileMap?.[selectedDocument?.id]);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const { url: fileURL } = await response.json();
 
-      const selectedDocData = requiredDocuments.find(doc => doc.id === selectedDocument);
-      const newDoc = {
+      const existing = uploadedDocuments.find(doc =>
+        doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
+      );
+
+      const docData = {
         companyId,
-        requiredDocumentId: selectedDocument,
-        documentName: selectedDocData?.name || "Documento",
-        entityType: "Empresa",
+        requiredDocumentId: selectedDocument?.id,
+        documentName: selectedDocument?.name || "Documento",
+        entityType: "company",
         entityId: companyId,
         entityName: userCompanyData?.companyName || "Empresa",
-        fileURL: downloadURL,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
+        fileURL,
+        fileName: fileMap?.[selectedDocument?.id]?.name,
+        fileType: fileMap?.[selectedDocument?.id]?.type,
+        fileSize: fileMap?.[selectedDocument?.id]?.size,
         uploadedAt: serverTimestamp(),
         status: "Pendiente de revisión",
-        comment: comment || "",
-        expirationDate: calculateInitialExpirationDate(selectedDocData)
+        comment,
+        expirationDate: selectedDocument.deadline?.date || null,
       };
 
-      await addDoc(collection(db, "uploadedDocuments"), newDoc);
-      resetForm();
+      if (existing) {
+        await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);
+      } else {
+        await addDoc(collection(db, "uploadedDocuments"), docData);
+      }
+
+      // Actualizar lista local
+      const updatedQuery = query(
+        collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "company")
+      );
+      const updatedSnapshot = await getDocs(updatedQuery);
+      setUploadedDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      setDialogOpen(false);
+      setComment("");
+      if (onDocumentUploaded) onDocumentUploaded();
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Upload error", error);
     } finally {
       setUploading(false);
-      setConfirmDialogOpen(false);
     }
   };
 
-  const calculateInitialExpirationDate = (doc) => {
-    if (!doc || !doc.deadline) return null;
-    const now = new Date();
-    if (doc.deadline.type === "custom") return doc.deadline.date;
-    if (doc.deadline.type === "monthly") {
-      now.setMonth(now.getMonth() + 1);
-      return now.toISOString();
-    }
-    if (doc.deadline.type === "biannual") {
-      now.setMonth(now.getMonth() + 6);
-      return now.toISOString();
-    }
-    return null;
-  };
-
-  const resetForm = () => {
-    setFile(null);
-    setComment("");
-    setSelectedDocument(null);
-    setCurrentStep("select");
-  };
-
-  const handleBack = () => {
-    setFile(null);
-    setComment("");
-    setCurrentStep("select");
-  };
-
-  return (
-    <>
-      {currentStep === "select" && (
-        <DocumentSelectionStep
-          documents={requiredDocuments}
-          uploadedDocs={uploadedDocuments}
-          onSelect={setSelectedDocument}
-          onNext={() => setCurrentStep("upload")}
-          selectedDocument={selectedDocument}
-        />
-      )}
-
-      {currentStep === "upload" && selectedDocument && (
-        <UploadStep
-          selectedDocument={requiredDocuments.find(d => d.id === selectedDocument)}
-          file={file}
-          comment={comment}
-          onFileChange={handleFileChange}
-          onCommentChange={(e) => setComment(e.target.value)}
-          onBack={handleBack}
-          onSubmit={() => setConfirmDialogOpen(true)}
-        />
-      )}
-
-      <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)}>
-        <DialogTitle>Confirmar envío</DialogTitle>
-        <DialogContent>
-          ¿Está seguro que desea subir este documento?
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleUpload} disabled={uploading}>
-            {uploading ? <CircularProgress size={24} /> : "Confirmar y Subir"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-}
-
-
-function DocumentSelectionStep({ documents, uploadedDocs, onSelect, onNext, selectedDocument }) {
   const getDaysToExpire = (doc) => {
     if (!doc.deadline?.date) return null;
     const diff = (new Date(doc.deadline.date) - new Date()) / (1000 * 60 * 60 * 24);
     return Math.floor(diff);
   };
+  const previewUrl = previewMap?.[selectedDocument?.id];
 
-  const getBackgroundColor = (daysToExpire) => {
-    if (daysToExpire === null) return "transparent";
 
-    if (daysToExpire <= 0) return "rgba(244, 67, 54, 0.2)"; // Rojo muy fuerte (vencido)
-    if (daysToExpire <= 1) return "rgba(244, 67, 54, 0.2)"; // 1 día o menos rojo
-    if (daysToExpire <= 10) return "rgba(255, 152, 0, 0.2)"; // Naranja
-    if (daysToExpire <= 20) return "rgba(255, 235, 59, 0.2)"; // Amarillo
-    return "transparent";
+  const openPreview = (url) => {
+    setPreviewUrl(url);
+    setPreviewOpen(true);
   };
 
   return (
     <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>Seleccione un documento</Typography>
+      <Typography variant="h6" gutterBottom>Documentos Requeridos</Typography>
       <Grid container spacing={2}>
-        {documents.map(doc => {
-          const daysToExpire = getDaysToExpire(doc);
-          const isSelected = selectedDocument === doc.id;
-          const bgColor = getBackgroundColor(daysToExpire);
+        {requiredDocuments.map(doc => {
+          const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
+          const days = getDaysToExpire(doc);
+          const bgColor = days <= 0 ? "rgba(244, 67, 54, 0.1)" :
+            days <= 10 ? "rgba(255, 152, 0, 0.1)" : "transparent";
 
           return (
-            <Grid xs={12} sm={6} md={4} key={doc.id}>
-              <Card
-                onClick={() => onSelect(doc.id)}
-                sx={{
-                  cursor: 'pointer',
-                  border: isSelected ? '3px solid #1976d2' : '1px solid #ccc',
-                  boxShadow: isSelected ? 6 : 1,
-                  backgroundColor: bgColor,
-                  transition: 'all 0.3s',
-                  '&:hover': {
-                    transform: 'translateY(-3px)',
-                    boxShadow: 6,
-                    borderColor: '#1976d2',
-                  }
-                }}
-              >
-               <CardContent>
-  <Box display="flex" alignItems="center" mb={2}>
-    <DescriptionIcon fontSize="large" color="primary" />
-    <Typography 
-      variant="h6" 
-      fontWeight="bold" 
-      ml={1}
-      sx={{ 
-        fontSize: '1.2rem',
-        color: isSelected ? '#1976d2' : 'inherit'
-      }}
-    >
-      {doc.name}
-    </Typography>
-  </Box>
-  {doc.deadline?.date && (
-    <Box mt={1}>
-      <Typography 
-        variant="subtitle1" 
-        color="error" 
-        fontWeight="bold"
-        sx={{
-          fontSize: '1rem',
-          backgroundColor: 'rgba(244, 67, 54, 0.1)',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          display: 'inline-block'
-        }}
-      >
-        Vence: {new Date(doc.deadline.date).toLocaleDateString()}
-      </Typography>
-      {daysToExpire !== null && daysToExpire <= 10 && (
-        <Typography 
-          variant="caption" 
-          display="block" 
-          mt={1}
-          color={daysToExpire <= 3 ? 'error' : 'warning.main'}
-        >
-          {daysToExpire <= 0 
-            ? '¡Documento vencido!' 
-            : `Faltan ${daysToExpire} día${daysToExpire !== 1 ? 's' : ''}`}
-        </Typography>
-      )}
-    </Box>
-  )}
-</CardContent>
+            <Grid item xs={12} sm={6} md={4} key={doc.id}>
+              <Card sx={{
+                backgroundColor: bgColor,
+                border: '1px solid #ddd',
+                '&:hover': { boxShadow: 3 }
+              }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <DescriptionIcon color="primary" />
+                    <Typography variant="subtitle1" fontWeight="bold">{doc.name}</Typography>
+                  </Box>
+
+                  {uploaded ? (
+                    <>
+                      <Chip
+                        label={uploaded.status}
+                        size="small"
+                        color={
+                          uploaded.status === "Aprobado" ? "success" :
+                            uploaded.status === "Rechazado" ? "error" : "warning"
+                        }
+                      />
+                      {uploaded.status === "Rechazado" && uploaded.adminComment && (
+                        <Typography variant="caption" color="error" display="block">
+                          Motivo: {uploaded.adminComment}
+                        </Typography>
+                      )}
+                      {uploaded.status === "Aprobado" && uploaded.expirationDate && (
+                        <Typography variant="caption" display="block">
+                          Vence: {new Date(uploaded.expirationDate).toLocaleDateString()}
+                        </Typography>
+                      )}
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Documento no cargado aún
+                    </Typography>
+                  )}
+
+                  {doc.deadline?.date && (
+                    <Tooltip title={days <= 0 ? "¡Vencido!" : `Faltan ${days} días`}>
+                      <Box display="flex" alignItems="center" mt={1}>
+                        <Typography variant="caption">
+                          Vence: {new Date(doc.deadline.date).toLocaleDateString()}
+                        </Typography>
+                        {days !== null && days <= 10 && (
+                          <WarningIcon fontSize="small" sx={{ ml: 1 }}
+                            color={days <= 0 ? "error" : "warning"} />
+                        )}
+                      </Box>
+                    </Tooltip>
+                  )}
+
+                  <Box mt={2}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        setSelectedDocument(doc);
+                        setDialogOpen(true);
+                      }}
+                    >
+                      {uploaded ? "Reemplazar" : "Subir"}
+                    </Button>
+                  </Box>
+                </CardContent>
               </Card>
             </Grid>
           );
         })}
       </Grid>
-      <Box mt={3} display="flex" justifyContent="flex-end">
-        <Button variant="contained" onClick={onNext} disabled={!selectedDocument}>Siguiente</Button>
-      </Box>
-    </Paper>
-  );
-}
 
-function UploadStep({ selectedDocument, file, comment, onFileChange, onCommentChange, onBack, onSubmit }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [previewType, setPreviewType] = useState('');
+      {/* Modal de subida */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Subir {selectedDocument?.name}</DialogTitle>
+        <DialogContent>
+  <Grid container spacing={4} alignItems="start">
+    {/* Ejemplo visual */}
+    <Grid item xs={12} md={6}>
+      <Typography variant="subtitle2" gutterBottom>Ejemplo:</Typography>
+      {selectedDocument?.exampleImage ? (
+        <img
+          src={selectedDocument.exampleImage}
+          alt="Ejemplo"
+          style={{ width: '100%', maxHeight: 250, objectFit: 'contain', borderRadius: 4 }}
+          onClick={() => openPreview(selectedDocument.exampleImage)}
+        />
+      ) : (
+        <Typography variant="body2" color="text.secondary">Sin ejemplo disponible</Typography>
+      )}
+    </Grid>
 
-  const openPreview = (url, type) => {
-    setPreviewUrl(url);
-    setPreviewType(type);
-    setPreviewOpen(true);
-  };
-
-  const daysToExpire = selectedDocument?.deadline?.date
-    ? Math.floor((new Date(selectedDocument.deadline.date) - new Date()) / (1000 * 60 * 60 * 24))
-    : null;
-
-  return (
-    <Paper sx={{ p: 3 }}>
-      {/* Header + Controles */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" fontWeight="bold" color="primary">
-          Subir documento: {selectedDocument?.name}
-        </Typography>
-        
-        {/* Fecha vencimiento */}
-        {selectedDocument?.deadline?.date && (
-          <Typography variant="subtitle1" color="error" mt={1}>
-            Vence: {new Date(selectedDocument.deadline.date).toLocaleDateString()}
-            {daysToExpire !== null && daysToExpire <= 10 && (
-              <Typography component="span" ml={2} color={daysToExpire <= 0 ? 'error' : 'warning.main'}>
-                {daysToExpire <= 0 ? '¡VENCIDO!' : `Faltan ${daysToExpire} días`}
-              </Typography>
-            )}
-          </Typography>
+    {/* Vista previa del archivo */}
+    <Grid item xs={12} md={6}>
+      <Typography variant="subtitle2" gutterBottom>Vista previa:</Typography>
+      <Paper
+        elevation={2}
+        sx={{
+          border: '2px dashed #2196f3',
+          padding: 2,
+          height: 250,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          overflow: 'hidden',
+          backgroundColor: '#f9f9f9',
+          '&:hover': {
+            boxShadow: 4,
+          }
+        }}
+        onClick={() => previewMap[selectedDocument?.id] && openPreview(previewMap[selectedDocument?.id])}
+      >
+        {fileMap?.[selectedDocument?.id] ? (
+          fileMap?.[selectedDocument?.id].type.startsWith("image/") ? (
+            <img src={previewMap[selectedDocument?.id]} alt="Preview" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+          ) : fileMap?.[selectedDocument?.id].type === "application/pdf" ? (
+            <iframe src={previewMap[selectedDocument?.id]} title="Vista previa PDF" width="100%" height="100%" style={{ border: "none" }} />
+          ) : (
+            <Typography variant="body2" color="text.secondary">Vista previa no disponible para este tipo</Typography>
+          )
+        ) : (
+          <Typography variant="body2" color="text.secondary">Sin archivo seleccionado</Typography>
         )}
-        
-        {/* Controles de subida */}
-        <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+      </Paper>
+    </Grid>
+  </Grid>
+
+  {/* Selector de archivo y comentario */}
+  <Box mt={4}>
+    <Button
+      component="label"
+      variant="contained"
+      startIcon={<UploadFileIcon />}
+      fullWidth
+    >
+      Seleccionar Archivo
+      <input
+        type="file"
+        hidden
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.ppt,.pptx"
+        onChange={(e) => {
+          const selected = e.target.files[0];
+          setFileMap(prev => ({
+            ...prev,
+            [selectedDocument?.id]: selected
+          }));
+          if (selected) {
+            const preview = URL.createObjectURL(selected);
+            setPreviewMap(prev => ({
+              ...prev,
+              [selectedDocument?.id]: preview
+            }));
+          }
+        }}
+      />
+    </Button>
+
+    {fileMap?.[selectedDocument?.id] && (
+      <Typography variant="body2" mt={1}>
+        Archivo seleccionado: {fileMap?.[selectedDocument?.id].name}
+      </Typography>
+    )}
+
+    <TextField
+      label="Comentario (opcional)"
+      multiline
+      rows={3}
+      fullWidth
+      value={comment}
+      onChange={(e) => setComment(e.target.value)}
+      sx={{ mt: 2 }}
+    />
+  </Box>
+</DialogContent>
+
+
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancelar</Button>
           <Button
+            onClick={handleUpload}
             variant="contained"
-            component="label"
-            startIcon={<UploadFileIcon />}
-            sx={{ flex: 1 }}
+            disabled={!fileMap?.[selectedDocument?.id] || uploading}
+            startIcon={uploading ? <CircularProgress size={20} /> : null}
           >
-            Seleccionar Archivo
-            <input type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" onChange={onFileChange} />
+            {uploading ? "Subiendo..." : "Confirmar"}
           </Button>
-          
-          <TextField
-            label="Comentario (opcional)"
-            value={comment}
-            onChange={onCommentChange}
-            multiline
-            rows={2}
-            sx={{ flex: 2 }}
-          />
-        </Box>
-      </Box>
-
-      {/* Grid de ejemplos */}
-      <Grid container spacing={3}>
-        {/* Ejemplo de documento */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-              <ImageIcon color="primary" sx={{ mr: 1 }} />
-              Ejemplo de documento
-            </Typography>
-            <Box
-              onClick={() => selectedDocument?.exampleImage && openPreview(selectedDocument.exampleImage, 'image')}
-              sx={{
-                border: '2px dashed #ccc',
-                borderRadius: 2,
-                height: 300,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: selectedDocument?.exampleImage ? 'pointer' : 'default',
-                transition: '0.3s',
-                '&:hover': { borderColor: selectedDocument?.exampleImage ? 'primary.main' : '#ccc' }
-              }}
-            >
-              {selectedDocument?.exampleImage ? (
-                <img src={selectedDocument.exampleImage} alt="Ejemplo" style={{ maxHeight: '90%', maxWidth: '90%' }} />
-              ) : (
-                <Typography color="text.secondary">No hay ejemplo disponible</Typography>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Vista previa */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-              <UploadIcon color="primary" sx={{ mr: 1 }} />
-              {file ? 'Archivo seleccionado' : 'Selecciona un archivo'}
-            </Typography>
-            <Box
-              onClick={() => {
-                if (file) {
-                  openPreview(URL.createObjectURL(file), file.type.startsWith('image/') ? 'image' : file.type === 'application/pdf' ? 'pdf' : '');
-                }
-              }}
-              sx={{
-                border: '2px dashed #ccc',
-                borderRadius: 2,
-                height: 350,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: file ? 'pointer' : 'default',
-                overflow: 'hidden'
-              }}
-            >
-              {file ? (
-                file.type.startsWith('image/') ? (
-                  <img src={URL.createObjectURL(file)} alt="Archivo" style={{ maxHeight: '90%',objectFit: 'contain', maxWidth: '90%' }} />
-                ) : file.type === 'application/pdf' ? (
-                  <iframe src={URL.createObjectURL(file)} title="PDF" width="100%" height="100%" style={{ border: 'none',minHeight: '350px' }} />
-                ) : (
-                  <DescriptionIcon fontSize="large" />
-                )
-              ) : (
-                <Box textAlign="center">
-                  <CloudUploadIcon fontSize="large" color="disabled" />
-                  <Typography mt={1} color="text.secondary">Sin archivo aún</Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Botones de acción */}
-      <Box display="flex" justifyContent="space-between" mt={4}>
-        <Button variant="outlined" onClick={onBack} sx={{ width: '48%' }}>
-          Volver
-        </Button>
-        <Button 
-          variant="contained" 
-          onClick={onSubmit} 
-          disabled={!file}
-          sx={{ width: '48%' }}
-        >
-          Confirmar
-        </Button>
-      </Box>
+        </DialogActions>
+      </Dialog>
 
       {/* Modal de vista previa */}
       <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
-        <Box p={2}>
-          {previewType === 'image' ? (
-            <img src={previewUrl} alt="Vista previa" style={{ width: '100%', height: 'auto' }} />
-          ) : previewType === 'pdf' ? (
-            <iframe src={previewUrl} title="Vista previa PDF" width="100%" height="600px" style={{ border: 'none' }} />
-          ) : (
-            <Typography>No se puede previsualizar este archivo.</Typography>
-          )}
-        </Box>
-      </Dialog>
+  <DialogContent>
+    {previewUrl &&
+    (fileMap?.[selectedDocument?.id]?.type?.startsWith('image/') ||
+      previewUrl.includes('.jpg') ||
+      previewUrl.includes('.jpeg') ||
+      previewUrl.includes('.png')) ? (
+      <img src={previewUrl} alt="Vista previa" style={{ width: '100%' }} />
+    ) : previewUrl ? (
+      <iframe
+        src={previewUrl}
+        title="Vista previa"
+        width="100%"
+        height="500px"
+        style={{ border: 'none' }}
+      />
+    ) : (
+      <Typography>No hay vista previa disponible.</Typography>
+    )}
+  </DialogContent>
+</Dialog>
     </Paper>
   );
 }
-
-export { UploadStep };

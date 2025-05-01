@@ -43,16 +43,13 @@ export default function AdminRequiredDocumentsPage() {
   const [documents, setDocuments] = useState([]);
   const [newDocName, setNewDocName] = useState("");
   const [entityType, setEntityType] = useState("company");
-  const [deadlineType, setDeadlineType] = useState("monthly");
-  const [day, setDay] = useState(1);
-  const [months, setMonths] = useState([1, 7]);
-  const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteDialogState, setDeleteDialogState] = useState({ open: false, documentId: null });
   const [exampleImage, setExampleImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [expirationDate, setExpirationDate] = useState("");
 
   const { selectedCompanyId } = useCompany();
   const theme = useTheme();
@@ -92,46 +89,6 @@ export default function AdminRequiredDocumentsPage() {
     }
   };
 
-  // Función para aplicar una plantilla de documentos a la empresa actual
-  const handleApplyTemplate = async (templateDocuments) => {
-    if (!selectedCompanyId || !templateDocuments || templateDocuments.length === 0) return;
-    
-    setLoading(true);
-    setError("");
-    
-    try {
-      // Crear cada documento de la plantilla en Firestore
-      const promises = templateDocuments.map(docTemplate => 
-        addDoc(collection(db, "requiredDocuments"), {
-          ...docTemplate,
-          companyId: selectedCompanyId,
-          createdAt: new Date().toISOString()
-        })
-      );
-      
-      await Promise.all(promises);
-      
-      // Recargar la lista de documentos
-      await loadDocuments();
-      
-    } catch (error) {
-      console.error("Error al aplicar plantilla:", error);
-      setError("Error al aplicar la plantilla de documentos.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const validateForm = () => {
-    const errors = {
-      name: !newDocName.trim() ? 'El nombre es requerido' : '',
-      entityType: !entityType ? 'Selecciona un tipo' : '',
-      deadline: deadlineType === 'custom' && !date ? 'Fecha requerida' : ''
-    };
-    setValidationErrors(errors);
-    return !Object.values(errors).some(error => error);
-  };
-
   const handleCreateDocument = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
@@ -139,15 +96,9 @@ export default function AdminRequiredDocumentsPage() {
     setLoading(true);
     setError("");
     try {
-      let deadline = { type: deadlineType };
-      if (deadlineType === "monthly") deadline.day = day;
-      if (deadlineType === "biannual") deadline.months = months;
-      if (deadlineType === "custom") deadline.date = date;
-
       let exampleImageUrl = "";
       if (exampleImage) {
         if (typeof exampleImage !== "string") {
-          // Sube nueva imagen
           const formData = new FormData();
           formData.append("file", exampleImage);
           formData.append("folder", "documentExamples");
@@ -159,16 +110,18 @@ export default function AdminRequiredDocumentsPage() {
           const data = await res.json();
           exampleImageUrl = data.url;
         } else {
-          // Usa URL existente
           exampleImageUrl = exampleImage;
         }
       }
+      
       const newDocument = {
         name: newDocName.trim(),
         entityType,
         companyId: selectedCompanyId,
         allowedFileTypes: [".pdf", ".jpg", ".jpeg", ".png"],
-        deadline,
+        deadline: {
+          date: expirationDate
+        },
         exampleImage: exampleImageUrl || "",
         createdAt: new Date().toISOString(),
       };
@@ -178,10 +131,7 @@ export default function AdminRequiredDocumentsPage() {
       // Limpiar formulario
       setNewDocName("");
       setEntityType("company");
-      setDeadlineType("monthly");
-      setDay(1);
-      setMonths([1, 7]);
-      setDate("");
+      setExpirationDate("");
       setExampleImage(null);
       setImagePreview("");
 
@@ -192,6 +142,16 @@ export default function AdminRequiredDocumentsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const validateForm = () => {
+    const errors = {
+      name: !newDocName.trim() ? 'El nombre es requerido' : '',
+      entityType: !entityType ? 'Selecciona un tipo' : '',
+      deadline: !expirationDate ? 'Fecha requerida' : ''
+    };
+    setValidationErrors(errors);
+    return !Object.values(errors).some(error => error);
   };
 
   const handleImageUpload = async (e) => {
@@ -314,49 +274,18 @@ export default function AdminRequiredDocumentsPage() {
                 'Este documento se aplica a la empresa en general.'}
             </Typography>
           </FormControl>
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Tipo de vencimiento</InputLabel>
-            <Select
-              value={deadlineType}
-              onChange={(e) => setDeadlineType(e.target.value)}
-              label="Tipo de vencimiento"
-              disabled={loading || !selectedCompanyId}
-            >
-              <MenuItem value="monthly">Mensual</MenuItem>
-              <MenuItem value="biannual">Semestral</MenuItem>
-              <MenuItem value="custom">Fecha fija</MenuItem>
-            </Select>
-          </FormControl>
-          {deadlineType === "monthly" && (
-            <TextField
-              label="Día"
-              type="number"
-              value={day}
-              onChange={(e) => setDay(Number(e.target.value))}
-              disabled={loading || !selectedCompanyId}
-              sx={{ width: 100 }}
-            />
-          )}
-          {deadlineType === "biannual" && (
-            <TextField
-              label="Meses (ej: 1,7)"
-              value={months.join(",")}
-              onChange={(e) => setMonths(e.target.value.split(",").map(Number))}
-              disabled={loading || !selectedCompanyId}
-              sx={{ width: 150 }}
-            />
-          )}
-          {deadlineType === "custom" && (
-            <TextField
-              label="Fecha"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              disabled={loading || !selectedCompanyId}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: 200 }}
-            />
-          )}
+          <TextField
+            label="Fecha de vencimiento"
+            type="date"
+            value={expirationDate}
+            onChange={(e) => setExpirationDate(e.target.value)}
+            disabled={loading || !selectedCompanyId}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 200 }}
+            required
+            error={!!validationErrors.deadline}
+            helperText={validationErrors.deadline}
+          />
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle2">Imagen de ejemplo (opcional)</Typography>
             <Box 
@@ -420,7 +349,34 @@ export default function AdminRequiredDocumentsPage() {
           Guarde la lista actual de documentos como una plantilla para reutilizarla con otras empresas, o aplique una plantilla existente.
         </Typography>
         <DocumentTemplateManager 
-          onApplyTemplate={handleApplyTemplate} 
+          onApplyTemplate={async (templateDocuments) => {
+            if (!selectedCompanyId || !templateDocuments || templateDocuments.length === 0) return;
+            
+            setLoading(true);
+            setError("");
+            
+            try {
+              // Crear cada documento de la plantilla en Firestore
+              const promises = templateDocuments.map(docTemplate => 
+                addDoc(collection(db, "requiredDocuments"), {
+                  ...docTemplate,
+                  companyId: selectedCompanyId,
+                  createdAt: new Date().toISOString()
+                })
+              );
+              
+              await Promise.all(promises);
+              
+              // Recargar la lista de documentos
+              await loadDocuments();
+              
+            } catch (error) {
+              console.error("Error al aplicar plantilla:", error);
+              setError("Error al aplicar la plantilla de documentos.");
+            } finally {
+              setLoading(false);
+            }
+          }} 
           currentDocuments={documents} 
         />
       </Paper>
@@ -449,7 +405,7 @@ export default function AdminRequiredDocumentsPage() {
                     <strong>Aplicable a:</strong> {doc.entityType}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Vencimiento:</strong> {doc.deadline?.type}
+                    <strong>Vencimiento:</strong> {doc.deadline?.date ? new Date(doc.deadline.date).toLocaleDateString() : 'Sin fecha'}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'flex-end' }}>

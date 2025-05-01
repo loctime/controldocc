@@ -3,8 +3,6 @@ import { AuthContext } from "../../context/AuthContext";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import Logo from "../../components/common/Logo";
-
-
 import {
   Box,
   Typography,
@@ -41,12 +39,12 @@ import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import BusinessIcon from "@mui/icons-material/Business";
-import PersonalForm from "./PersonalForm";
-import VehiculosForm from "./VehiculosForm";
-import DocumentosEmpresaForm from "./DocumentosEmpresaForm";
-import DocumentosPersonalForm from "./DocumentosPersonalForm";
-import DocumentosVehiculoForm from "./DocumentosVehiculoForm";
-import PersonalImportForm from "./PersonalImportForm";
+import PersonalForm from "../usuario/PersonalForm";
+import VehiculosForm from "../usuario/VehiculosForm";
+import DocumentosEmpresaForm from "../usuario/DocumentosEmpresaForm";
+import DocumentosPersonalForm from "../usuario/DocumentosPersonalForm";
+import DocumentosVehiculoForm from "../usuario/DocumentosVehiculoForm";
+import PersonalImportForm from "../usuario/PersonalImportForm";
 
 const UsuarioDashboard = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
@@ -846,7 +844,7 @@ const UsuarioDashboard = () => {
       {/* Panel de Empresa */}
       {tabValue === 3 && (
         <>
-          <DocumentosEmpresaForm />
+          <DocumentosEmpresaForm onDocumentUploaded={refreshUploadedDocuments} />
           
           <Paper elevation={2} sx={{ p: 3, mt: 4 }}>
             <Typography variant="h6" gutterBottom>
