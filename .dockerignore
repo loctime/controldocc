@@ -1,0 +1,10 @@
+node_modules
+.env
+dist
+src/uploadconvert/upload
+src/uploadconvert/converted
+.vscode
+.git
+.gitignore
+Dockerfile
+README.md
