@@ -52,28 +52,44 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     if (!selectedDocument || !fileMap?.[selectedDocument?.id]) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", fileMap?.[selectedDocument?.id]);
-  
-      // ✅ Obtener token de Firebase del usuario actual
-      const currentUser = getAuth().currentUser;
-      const token = currentUser ? await currentUser.getIdToken() : null;
-  
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-  
-      const { url: fileURL } = await response.json();
-      if (!response.ok || !fileURL) {
-        throw new Error("No se pudo subir el archivo correctamente.");
+      const auth = getAuth();
+      const user = auth.currentUser;
+      
+      if (!user) {
+        console.error('[UPLOAD] No hay usuario autenticado');
+        alert('⚠️ Por favor inicia sesión antes de subir archivos');
+        return;
       }
-  
-      // ...resto del código sin cambios...
-  
+
+      console.log('[UPLOAD] Obteniendo token de usuario:', user.uid);
+      const token = await user.getIdToken(true);
+      console.log('[UPLOAD] Token obtenido (inicio):', token.slice(0, 10) + '...');
+
+      const formData = new FormData();
+      formData.append('file', fileMap?.[selectedDocument?.id]);
+      formData.append('email', user.email);
+
+      console.log('[UPLOAD] Enviando a:', import.meta.env.VITE_API_URL);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[UPLOAD] Error del servidor:', errorData);
+        throw new Error(errorData.error || 'Error en la subida');
+      }
+
+      const result = await response.json();
+      console.log('[UPLOAD] Subida exitosa:', {
+        url: result.url,
+        size: fileMap?.[selectedDocument?.id].size
+      });
+      
       const existing = uploadedDocuments.find(doc =>
         doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
       );
@@ -85,7 +101,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         entityType: "company",
         entityId: companyId,
         entityName: userCompanyData?.companyName || "Empresa",
-        fileURL,
+        fileURL: result.url,
         fileName: fileMap?.[selectedDocument?.id]?.name,
         fileType: fileMap?.[selectedDocument?.id]?.type,
         fileSize: fileMap?.[selectedDocument?.id]?.size,
@@ -114,7 +130,10 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       setComment("");
       if (onDocumentUploaded) onDocumentUploaded();
     } catch (error) {
-      console.error("Upload error", error);
+      console.error('[UPLOAD] Error completo:', {
+        message: error.message,
+        stack: error.stack
+      });
     } finally {
       setUploading(false);
     }

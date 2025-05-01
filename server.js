@@ -13,15 +13,31 @@ import { authenticateFirebaseUser } from './middleware/authenticateFirebaseUser.
 // Cargar variables de entorno
 config({ path: '.env' });
 
-// Inicializar Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
+// Configuración Firebase Admin
+const firebaseAdminConfig = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+};
+
+console.log('[SERVER] Validando configuración Firebase Admin');
+if (!firebaseAdminConfig.projectId || !firebaseAdminConfig.clientEmail || !firebaseAdminConfig.privateKey) {
+  console.error('[SERVER] Error: Faltan variables de entorno para Firebase Admin');
+  process.exit(1);
 }
+
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  }),
+});
+
+console.log('[SERVER] Firebase Admin inicializado correctamente para proyecto:', 
+  firebaseAdminConfig.projectId);
+
 const adminDb = admin.firestore();
-
-
 
 const app = express();
 const upload = multer();
@@ -80,7 +96,7 @@ app.post('/api/upload', authenticateFirebaseUser, upload.single('file'), async (
     }
     // Guardar metadatos en Firestore
     await adminDb.collection("documentos").add({
-      nombreOriginal: originalName,
+      nombreOriginal: req.file.originalname,
       tipo: 'application/pdf',
       urlB2: uploadResult.url,
       fechaSubida: new Date(),
