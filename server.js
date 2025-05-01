@@ -5,14 +5,14 @@ import multer from 'multer';
 import { uploadFile } from './src/services/backblazeService.js';
 import { config } from 'dotenv';
 
-// Cargar variables de entorno desde .env
+// Cargar variables de entorno
 config({ path: '.env' });
 
 const app = express();
 const upload = multer();
 const port = process.env.PORT || 3000;
 
-// Orígenes permitidos
+// Lista blanca de orígenes permitidos
 const allowedOrigins = [
   "http://localhost:5173",
   "https://controldocc.vercel.app"
@@ -28,14 +28,19 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST'],
-  credentials: true // ← activalo si pensás usar cookies o headers autenticados
+  credentials: true
 }));
 
-// Middlewares para parsing
+// Middlewares de parseo
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ruta de subida de archivos
+// ✅ Ruta de prueba para mantener vivo Render
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ status: 'active', timestamp: new Date() });
+});
+
+// ✅ Ruta de subida de archivos
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
@@ -47,7 +52,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       : Buffer.from(req.file.buffer);
 
     const uploadResult = await uploadFile(fileBuffer, req.file.mimetype);
-
     console.log('Nombre recibido:', req.file.originalname);
     res.json(uploadResult);
   } catch (error) {
@@ -58,5 +62,5 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 // Iniciar servidor
 app.listen(port, () => {
-  console.log(`Servidor backend corriendo en puerto ${port}`);
+  console.log(`✅ Servidor backend corriendo en puerto ${port}`);
 });

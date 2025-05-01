@@ -32,13 +32,14 @@ import {
   TableCell,
   Tooltip
 } from "@mui/material";
-
+import { auth, firebaseSignOut } from "../../firebaseconfig";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PersonIcon from "@mui/icons-material/Person";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import BusinessIcon from "@mui/icons-material/Business";
+import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import PersonalForm from "../usuario/PersonalForm";
 import VehiculosForm from "../usuario/VehiculosForm";
 import DocumentosEmpresaForm from "../usuario/DocumentosEmpresaForm";
@@ -50,7 +51,7 @@ const UsuarioDashboard = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   
-  const { user } = useContext(AuthContext);
+  const { user, signOut } = useContext(AuthContext);
   const [company, setCompany] = useState(null);
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -220,10 +221,35 @@ const UsuarioDashboard = () => {
   }
 
   return (
-    <Box sx={{ p: 3, padding: '2px', paddingTop: '6px', }}>
-      <Typography variant="h4" gutterBottom>
-        Bienvenido a ControlDoc
-      </Typography>
+    <Box sx={{ p: 3, padding: '2px', paddingTop: '6px', position: 'relative' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 2
+      }}>
+        <Typography variant="h4" gutterBottom>
+          Bienvenido a ControlDoc
+        </Typography>
+        <Button 
+  variant="outlined" 
+  color="error"
+  startIcon={<ExitToAppIcon />}
+  onClick={async () => {
+    try {
+      await firebaseSignOut(auth);
+      window.location.href = '/login';
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      alert("Ocurrió un error al cerrar sesión. Por favor intenta nuevamente.");
+    }
+  }}
+  sx={{ ml: 2 }}
+>
+  Cerrar Sesión
+</Button>
+      </Box>
+
       {company && (
         <Paper elevation={2} sx={{ 
           p: 3, 
