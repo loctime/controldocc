@@ -1,5 +1,6 @@
 // DocumentosEmpresaForm.jsx
 import React, { useEffect, useState } from "react";
+import { getAuth } from "firebase/auth";
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
   DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography
@@ -20,7 +21,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
- 
+
   const [comment, setComment] = useState("");
   const [uploading, setUploading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,13 +54,26 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     try {
       const formData = new FormData();
       formData.append("file", fileMap?.[selectedDocument?.id]);
-      
+  
+      // ✅ Obtener token de Firebase del usuario actual
+      const currentUser = getAuth().currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : null;
+  
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: "POST",
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
+  
       const { url: fileURL } = await response.json();
-
+      if (!response.ok || !fileURL) {
+        throw new Error("No se pudo subir el archivo correctamente.");
+      }
+  
+      // ...resto del código sin cambios...
+  
       const existing = uploadedDocuments.find(doc =>
         doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
       );
@@ -105,7 +119,6 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       setUploading(false);
     }
   };
-
   const getDaysToExpire = (doc) => {
     if (!doc.deadline?.date) return null;
     const diff = (new Date(doc.deadline.date) - new Date()) / (1000 * 60 * 60 * 24);
@@ -118,7 +131,6 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     setPreviewUrl(url);
     setPreviewOpen(true);
   };
-
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>Documentos Requeridos</Typography>
