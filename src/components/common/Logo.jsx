@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import { db } from '../../firebaseconfig';
 import { doc, getDoc } from 'firebase/firestore';
-import defaultLogo from '../../assets/logos/controldoc-logo.svg';
+import defaultLogo from '../../assets/logos/controldoc-logo.jpg';
 
 /**
  * Componente Logo que muestra el logo de ControlDoc o el logo personalizado de la empresa
