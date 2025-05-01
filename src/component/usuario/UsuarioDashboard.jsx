@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import Logo from "../../components/common/Logo";
 
 
 import {
@@ -221,36 +222,66 @@ const UsuarioDashboard = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, padding: '2px', paddingTop: '6px', }}>
       <Typography variant="h4" gutterBottom>
         Bienvenido a ControlDoc
       </Typography>
-
       {company && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6">
-            Empresa: {company.name}
-          </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
-            CUIT: {company.cuit || "No registrado"}
-          </Typography>
+        <Paper elevation={2} sx={{ 
+          p: 3, 
+          mb: 4, 
+          display: 'grid', 
+          gridTemplateColumns: 'auto 1fr',
+          alignItems: 'center'
+        }}>
+          <Logo companyId={company.id} height={80} variant="company" sx={{ flexShrink: 0 }} />
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%'
+          }}>
+            <Typography variant="h6">
+              Empresa: {company.name}
+            </Typography>
+            <Typography variant="subtitle1" color="textSecondary">
+              CUIT: {company.cuit || "No registrado"}
+            </Typography>
+          </Box>
         </Paper>
       )}
+      <Box sx={{ width: '100%', mb: 2 }}>
+  <Tabs
+    value={tabValue}
+    onChange={handleTabChange}
+    variant="fullWidth"
+    textColor="primary"
+    indicatorColor="primary"
+    sx={{ minHeight: 40 }}
+  >
+    <Tab
+      icon={<DescriptionIcon fontSize="small" />}
+      label="DOCUMENTOS"
+      sx={{ minHeight: 40, py: 0.5 }}
+    />
+    <Tab
+      icon={<PersonIcon fontSize="small" />}
+      label="PERSONAL"
+      sx={{ minHeight: 40, py: 0.5 }}
+    />
+    <Tab
+      icon={<DirectionsCarIcon fontSize="small" />}
+      label="VEHÍCULOS"
+      sx={{ minHeight: 40, py: 0.5 }}
+    />
+    <Tab
+      icon={<BusinessIcon fontSize="small" />}
+      label="EMPRESA"
+      sx={{ minHeight: 40, py: 0.5 }}
+    />
+  </Tabs>
+</Box>
 
-      <Box sx={{ width: '100%', mb: 4 }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          variant="fullWidth"
-          textColor="primary"
-          indicatorColor="primary"
-        >
-          <Tab icon={<DescriptionIcon />} label="DOCUMENTOS" />
-          <Tab icon={<PersonIcon />} label="PERSONAL" />
-          <Tab icon={<DirectionsCarIcon />} label="VEHÍCULOS" />
-          <Tab icon={<BusinessIcon />} label="EMPRESA" />
-        </Tabs>
-      </Box>
       {/* Panel de Documentos */}
       {tabValue === 0 && (
         <>
@@ -263,33 +294,33 @@ const UsuarioDashboard = () => {
               <Typography color="textSecondary">
                 No hay documentos requeridos configurados para esta empresa.
               </Typography>
-            ) : (
-<Grid container spacing={3} columns={{ xs: 12, sm: 12, md: 12 }}>
-               {/* Documentos de Empresa */}
+                                  ) : (
+                      <Grid container spacing={3} columns={{ xs: 12, sm: 12, md: 12 }}>
+                        {/* Documentos de Empresa */}
                <Grid xs={12} md={4}>
-  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <Badge color="error" variant="dot" invisible={!hasWarningsForType("company")}>
-      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-        Documentos de Empresa
-      </Typography>
-    </Badge>
-    <Typography variant="body2" sx={{ mb: 2 }}>
-      Documentos generales de la empresa
-    </Typography>
-    <Box sx={{ flexGrow: 1 }} />
-    <Button 
-      variant="contained" 
-      color="primary"
-      startIcon={<UploadFileIcon />}
-      onClick={() => {
-        setTabValue(3); // Cambiar a la pestaña de Empresa
-      }}
-      fullWidth
-    >
-      Ver Documentos
-    </Button>
-  </Paper>
-</Grid>      
+                <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <Badge color="error" variant="dot" invisible={!hasWarningsForType("company")}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Documentos de Empresa
+                    </Typography>
+                  </Badge>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    Documentos generales de la empresa
+                  </Typography>
+                  <Box sx={{ flexGrow: 1 }} />
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    startIcon={<UploadFileIcon />}
+                    onClick={() => {
+                      setTabValue(3); // Cambiar a la pestaña de Empresa
+                    }}
+                    fullWidth
+                  >
+                    Ver Documentos
+                  </Button>
+                </Paper>
+                </Grid>      
                 {/* Documentos de Personal */}
                 <Grid xs={12} md={4}>
                   <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -314,43 +345,36 @@ const UsuarioDashboard = () => {
                       Ver Personal
                     </Button>
                   </Paper>
+                </Grid>            
+                {/* Documentos de Vehículos */}
+                <Grid xs={12} md={4}>
+                  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  {/* Badge correctamente colocado */}
+                  <Badge color="error" variant="dot" invisible={!hasWarningsForType("vehicle")}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Documentos de Vehículos
+                    </Typography>
+                  </Badge>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    Documentos específicos para cada vehículo
+                  </Typography>
+                  <Box sx={{ flexGrow: 1 }} />
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    startIcon={<DirectionsCarIcon />}
+                    onClick={() => {
+                      setTabValue(2); // Cambiar a la pestaña de Vehículos
+                    }}
+                    fullWidth
+                  >
+                    Ver Vehículos
+                  </Button>
+                  </Paper>
                 </Grid>
-                
-{/* Documentos de Vehículos */}
-<Grid xs={12} md={4}>
-
-  <Paper elevation={1} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-    
-    {/* Badge correctamente colocado */}
-    <Badge color="error" variant="dot" invisible={!hasWarningsForType("vehicle")}>
-      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-        Documentos de Vehículos
-      </Typography>
-    </Badge>
-
-    <Typography variant="body2" sx={{ mb: 2 }}>
-      Documentos específicos para cada vehículo
-    </Typography>
-
-    <Box sx={{ flexGrow: 1 }} />
-
-    <Button 
-      variant="contained" 
-      color="primary"
-      startIcon={<DirectionsCarIcon />}
-      onClick={() => {
-        setTabValue(2); // Cambiar a la pestaña de Vehículos
-      }}
-      fullWidth
-    >
-      Ver Vehículos
-    </Button>
-  </Paper>
-</Grid>
               </Grid>
             )}
-          </Paper>
-          
+          </Paper>    
           <Paper elevation={2} sx={{ p: 3, mt: 4 }}>
             <Typography variant="h6" gutterBottom>
               Lista de Documentos Requeridos

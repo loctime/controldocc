@@ -12,17 +12,30 @@ const app = express();
 const upload = multer();
 const port = process.env.PORT || 3000;
 
-// ✅ CORS: permitir solo desde tu dominio en Vercel
+// Orígenes permitidos
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://controldocc.vercel.app"
+];
+
+// Middleware CORS
 app.use(cors({
-  origin: 'https://controldocc.vercel.app',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS bloqueado para origen: " + origin));
+    }
+  },
   methods: ['GET', 'POST'],
-  credentials: false
+  credentials: true // ← activalo si pensás usar cookies o headers autenticados
 }));
 
+// Middlewares para parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ruta para subir archivos
+// Ruta de subida de archivos
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
@@ -33,13 +46,9 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       ? req.file.buffer
       : Buffer.from(req.file.buffer);
 
-    const uploadResult = await uploadFile(
-      fileBuffer,
-      req.file.mimetype
-    );
+    const uploadResult = await uploadFile(fileBuffer, req.file.mimetype);
 
     console.log('Nombre recibido:', req.file.originalname);
-
     res.json(uploadResult);
   } catch (error) {
     console.error('Error en upload:', error);
@@ -47,6 +56,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// Iniciar servidor
 app.listen(port, () => {
   console.log(`Servidor backend corriendo en puerto ${port}`);
 });

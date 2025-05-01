@@ -437,7 +437,7 @@ export default function AdminRequiredDocumentsPage() {
       ) : (
         <Grid container spacing={3}>
           {documents.map((doc) => (
-            <Grid item xs={12} sm={6} md={4} key={doc.id}>
+            <Grid xs={12} sm={6} md={4} key={doc.id}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box display="flex" alignItems="center" mb={1}>

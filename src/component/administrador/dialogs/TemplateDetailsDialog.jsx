@@ -43,7 +43,7 @@ const TemplateDetailsDialog = ({
         <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
           <Grid container spacing={2}>
             {template.documents?.map((doc, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
+              <Grid xs={12} sm={6} md={4} key={index}>
                 <Paper
                   elevation={1}
                   sx={{

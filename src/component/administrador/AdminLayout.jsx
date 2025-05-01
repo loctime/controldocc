@@ -135,9 +135,11 @@ export default function AdminLayout() {
 const handleLogout = async () => {
 try {
   await signOut(auth);
-  localStorage.removeItem('userCompany'); // 🔥 IMPORTANTE
+  localStorage.removeItem('userCompany');
+  localStorage.removeItem('isAdminSession'); // Limpiar flag de admin
   handleProfileMenuClose();
   navigate('/login');
+  window.location.reload(); // Forzar refresh
 } catch (error) {
   console.error('Error al cerrar sesión:', error);
 }
@@ -182,16 +184,7 @@ try {
       path: '/admin/uploaded-documents',
       highlight: true // Marcamos esta opción para destacarla
     },
-    { 
-      text: 'Tareas',
-      icon: <AssignmentIcon />,
-      path: '/admin/tareas'
-    },
-    { 
-      text: 'Aprobaciones',
-      icon: <AssignmentTurnedInIcon />,
-      path: '/admin/approvals'
-    }
+   
   ];
 
   return (

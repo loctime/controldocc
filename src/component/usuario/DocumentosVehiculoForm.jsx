@@ -147,7 +147,7 @@ export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = 
               const vencimientoColor = getDeadlineColor(status?.expirationDate);
               const canUpload = !status || status.status === "Rechazado";
               return (
-                <Grid item xs={12} sm={6} md={4} key={doc.id}>
+                <Grid xs={12} sm={6} md={4} key={doc.id}>
                   <Paper
                     sx={{ p: 2, cursor: canUpload ? "pointer" : "default", border: selectedDocument === doc.id ? "2px solid #1976d2" : "1px solid #ccc" }}
                     onClick={() => canUpload && setSelectedDocument(doc.id)}

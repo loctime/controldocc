@@ -182,7 +182,7 @@ function DocumentSelectionStep({ documents, uploadedDocs, onSelect, onNext, sele
           const bgColor = getBackgroundColor(daysToExpire);
 
           return (
-            <Grid item xs={12} sm={6} md={4} key={doc.id}>
+            <Grid xs={12} sm={6} md={4} key={doc.id}>
               <Card
                 onClick={() => onSelect(doc.id)}
                 sx={{

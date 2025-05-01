@@ -185,8 +185,7 @@ const DocumentosForm = () => {
       const formData = new FormData();
       formData.append("file", file);
     
-      const response = await fetch(`${i
-        mport.meta.env.VITE_API_URL}/api/upload`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: "POST",
         body: formData,
       });
