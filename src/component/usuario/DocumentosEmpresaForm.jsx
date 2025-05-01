@@ -1,6 +1,6 @@
 // DocumentosEmpresaForm.jsx
 import React, { useEffect, useState } from "react";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
   DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography
@@ -28,6 +28,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [fileMap, setFileMap] = useState({});
   const [previewMap, setPreviewMap] = useState({});
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
@@ -47,29 +48,37 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     };
     fetchDocuments();
   }, [companyId, onDocumentUploaded]);
-
+  const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    const auth = getAuth();
+  
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+  
+    return () => unsubscribe();
+  }, []);
+  
   const handleUpload = async () => {
     if (!selectedDocument || !fileMap?.[selectedDocument?.id]) return;
     setUploading(true);
+  
     try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      
-      if (!user) {
-        console.error('[UPLOAD] No hay usuario autenticado');
-        alert('⚠️ Por favor inicia sesión antes de subir archivos');
+      if (!currentUser) {
+        alert('Sesión expirada. Por favor, vuelve a iniciar sesión.');
         return;
       }
-
-      console.log('[UPLOAD] Obteniendo token de usuario:', user.uid);
-      const token = await user.getIdToken(true);
-      console.log('[UPLOAD] Token obtenido (inicio):', token.slice(0, 10) + '...');
-
+      
+      const token = await currentUser.getIdToken(true);
+      console.log('[UPLOAD] Token generado:', token?.slice(0, 10) + '...');
+  
       const formData = new FormData();
       formData.append('file', fileMap?.[selectedDocument?.id]);
-      formData.append('email', user.email);
-
-      console.log('[UPLOAD] Enviando a:', import.meta.env.VITE_API_URL);
+      formData.append('email', currentUser.email);
+      formData.append('folder', 'documentExamples');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: 'POST',
         headers: {
@@ -77,23 +86,23 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         },
         body: formData
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         console.error('[UPLOAD] Error del servidor:', errorData);
         throw new Error(errorData.error || 'Error en la subida');
       }
-
+  
       const result = await response.json();
       console.log('[UPLOAD] Subida exitosa:', {
         url: result.url,
         size: fileMap?.[selectedDocument?.id].size
       });
-      
+  
       const existing = uploadedDocuments.find(doc =>
         doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
       );
-
+  
       const docData = {
         companyId,
         requiredDocumentId: selectedDocument?.id,
@@ -110,13 +119,13 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         comment,
         expirationDate: selectedDocument.deadline?.date || null,
       };
-
+  
       if (existing) {
         await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);
       } else {
         await addDoc(collection(db, "uploadedDocuments"), docData);
       }
-
+  
       // Actualizar lista local
       const updatedQuery = query(
         collection(db, "uploadedDocuments"),
@@ -125,7 +134,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       );
       const updatedSnapshot = await getDocs(updatedQuery);
       setUploadedDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
+  
       setDialogOpen(false);
       setComment("");
       if (onDocumentUploaded) onDocumentUploaded();
@@ -143,13 +152,17 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     const diff = (new Date(doc.deadline.date) - new Date()) / (1000 * 60 * 60 * 24);
     return Math.floor(diff);
   };
-  const previewUrl = previewMap?.[selectedDocument?.id];
-
 
   const openPreview = (url) => {
     setPreviewUrl(url);
     setPreviewOpen(true);
   };
+  console.log({
+    selectedId: selectedDocument?.id,
+    file: fileMap?.[selectedDocument?.id],
+    uploading,
+    currentUser
+  });
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>Documentos Requeridos</Typography>
@@ -341,13 +354,14 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancelar</Button>
           <Button
-            onClick={handleUpload}
-            variant="contained"
-            disabled={!fileMap?.[selectedDocument?.id] || uploading}
-            startIcon={uploading ? <CircularProgress size={20} /> : null}
-          >
-            {uploading ? "Subiendo..." : "Confirmar"}
-          </Button>
+  onClick={handleUpload}
+  variant="contained"
+  disabled={!fileMap?.[selectedDocument?.id] || uploading || !currentUser}
+  startIcon={uploading ? <CircularProgress size={20} /> : null}
+>
+  {uploading ? "Subiendo..." : "Confirmar"}
+</Button>
+
         </DialogActions>
       </Dialog>
 

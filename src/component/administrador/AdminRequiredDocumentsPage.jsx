@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { db } from "../../firebaseconfig";
+import { db, } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompany } from "../../contexts/company-context";
 import DocumentTemplateManager from "./DocumentTemplateManager";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
+import { getAuth } from "firebase/auth";
 import {
   Box,
   Typography,
@@ -157,20 +158,34 @@ export default function AdminRequiredDocumentsPage() {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
+  
     try {
       setIsUploadingImage(true);
-
+  
+      // ✅ Obtener token del usuario autenticado
+      const user = getAuth().currentUser;
+      const token = user && await user.getIdToken();
+  
+      if (!token) {
+        throw new Error("Usuario no autenticado");
+      }
+  
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", "documentExamples");
-
+  
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  
       const res = await fetch(`${apiUrl}/api/upload`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ Enviar token al backend
+        },
         body: formData,
       });
+  
       const data = await res.json();
+  
       if (res.ok) {
         setExampleImage(data.url);
         setImagePreview(URL.createObjectURL(file));
