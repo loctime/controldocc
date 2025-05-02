@@ -95,7 +95,7 @@ const handleUpload = async () => {
       d.entityId === vehiculo.id && d.requiredDocumentId === selectedDocument
     )?.id;
 
-    const docData = {
+    const rawDocData = {
       companyId,
       requiredDocumentId: selectedDocument,
       documentName: requiredDocuments.find(d => d.id === selectedDocument)?.name || "Documento",
@@ -106,11 +106,16 @@ const handleUpload = async () => {
       fileURL: url,
       fileName: pdfName,
       fileType: "application/pdf",
-      fileSize: file.size,
+      fileSize: file?.size,
       uploadedAt: serverTimestamp(),
       status: "Pendiente de revisión",
       comment: comment || ""
     };
+    
+    const docData = Object.fromEntries(
+      Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
+    );
+    
 
     if (docRef) {
       await updateDoc(doc(db, "uploadedDocuments", docRef), docData);
