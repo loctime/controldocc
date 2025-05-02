@@ -27,13 +27,15 @@ export async function authenticateFirebaseUser(req, res, next) {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     console.log('[AUTH] Usuario autenticado:', {
       uid: decodedToken.uid,
-      email: decodedToken.email
+      email: decodedToken.email,
+      companyId: decodedToken.companyId
     });
     
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
-      role: decodedToken.role || 'user'
+      role: decodedToken.role || 'user',
+      companyId: decodedToken.companyId || null
     };
     
     next();
