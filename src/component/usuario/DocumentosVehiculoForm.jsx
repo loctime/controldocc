@@ -80,7 +80,7 @@ const handleUpload = async () => {
     const formData = new FormData();
     formData.append("file", file);
   
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/convert`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
       method: "POST",
       body: formData,
       headers: {

@@ -97,7 +97,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       formData.append('folder', 'companyDocuments');
       
       // Cambiar a endpoint de conversión
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/convert`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -161,7 +161,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         message: error.message,
         stack: error.stack
       });
-      alert(`Error al convertir/subir documento: ${error.message}`);
+      alert(`Error al procesar el documento: ${error.message}`);
     } finally {
       setUploading(false);
     }
