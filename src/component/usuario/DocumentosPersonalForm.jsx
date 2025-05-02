@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import {
   Paper, Typography, Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Tooltip, CircularProgress
 } from "@mui/material";
+import { getAuth } from "firebase/auth";
 import {
   UploadFile as UploadFileIcon,
   Description as DescriptionIcon,
@@ -27,7 +28,19 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
 
   const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
+  const [currentUser, setCurrentUser] = useState(null);
 
+  useEffect(() => {
+    const auth = getAuth();
+    setCurrentUser(auth.currentUser);
+  
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      setCurrentUser(user || null);
+    });
+  
+    return () => unsubscribe();
+  }, []);
+  
   useEffect(() => {
     if (!companyId || !persona) return;
   
@@ -63,21 +76,34 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
     if (!selectedDocument || !file) return;
     setUploading(true);
     try {
+      if (!currentUser) {
+        alert("Sesión expirada. Por favor vuelve a iniciar sesión.");
+        return;
+      }
+  
+      const token = await currentUser.getIdToken();
+  
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, { method: "POST", body: formData });
+  
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+  
       if (!res.ok) throw new Error("Upload error");
       const { url } = await res.json();
   
       const selectedDocData = requiredDocuments.find(d => d.id === selectedDocument);
   
-      // Buscar si ya existe uno
       const existingDoc = uploadedDocuments.find(
         (doc) => doc.entityId === persona.id && doc.requiredDocumentId === selectedDocument
       );
   
       if (existingDoc) {
-        // 🔵 Si ya existe, actualizarlo
         const docRef = doc(db, "uploadedDocuments", existingDoc.id);
         await updateDoc(docRef, {
           fileURL: url,
@@ -104,17 +130,15 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
           status: "Pendiente de revisión",
           comment: comment || ""
         };
-        
+  
         const cleanDocData = cleanFirestoreData(rawDocData);
-        
         await addDoc(collection(db, "uploadedDocuments"), cleanDocData);
-        
-        
       }
+  
       if (onDocumentUploaded) {
-        onDocumentUploaded(); // 🔥 Avisar que se subió un documento
+        onDocumentUploaded();
       }
-      // 🔥 Recargar los documentos subidos
+  
       const uploadedSnap = await getDocs(query(
         collection(db, "uploadedDocuments"),
         where("companyId", "==", companyId),
@@ -125,12 +149,14 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
   
       resetForm();
     } catch (e) {
-      console.error(e);
+      console.error("Error en handleUpload:", e);
+      alert("Error al subir el documento. Intenta nuevamente.");
     } finally {
       setUploading(false);
       setConfirmDialogOpen(false);
     }
   };
+  
   
 
   const resetForm = () => {
