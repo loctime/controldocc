@@ -1,9 +1,9 @@
 // DocumentosPersonalForm.jsx mejorado final
 import React, { useState, useEffect } from "react";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   Paper, Typography, Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Tooltip, CircularProgress
 } from "@mui/material";
-import { getAuth } from "firebase/auth";
 import {
   UploadFile as UploadFileIcon,
   Description as DescriptionIcon,
