@@ -6,6 +6,6 @@ src/uploadconvert/converted
 .vscode
 .git
 .gitignore
-Dockerfile
 control-doc-4959a-firebase-adminsdk-fbsvc-b0d83f7b8e.json
-README.md
+
+control-doc-*.json

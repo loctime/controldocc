@@ -1,22 +1,22 @@
-# Imagen base
 FROM node:18
 
-# Instalar LibreOffice e ImageMagick
+# Instalar herramientas necesarias
 RUN apt-get update && \
     apt-get install -y libreoffice imagemagick && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Carpeta de trabajo
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar todo
-COPY . .
+# Copiar solo backend
+COPY backend ./backend
+COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install
+# Instalar dependencias si package.json está en raíz
+RUN cd backend && npm install
 
-# Puerto del backend
-EXPOSE 3000
+# Exponer el puerto
+EXPOSE 3001
 
 # Comando para iniciar
-CMD ["node", "server.js"]
+CMD ["node", "backend/server.js"]
