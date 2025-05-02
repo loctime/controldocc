@@ -31,7 +31,7 @@ export default (upload) => {
           urlB2: uploadResult.url,
           fechaSubida: new Date(),
           estado: 'pendiente de revisión',
-          usuarioEmail: req.user.email,
+          usuarioEmail: req.user.email ?? `usuario-${req.user.uid}`,
           subidoPorUid: req.user.uid,
         };
 
