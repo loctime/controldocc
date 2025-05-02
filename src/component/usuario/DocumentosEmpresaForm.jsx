@@ -3,7 +3,8 @@ import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
-  DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography
+  DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography,
+  Alert, AlertTitle
 } from "@mui/material";
 import {
   Description as DescriptionIcon,
@@ -51,21 +52,36 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
   const [currentUser, setCurrentUser] = useState(null);
   useEffect(() => {
     const auth = getAuth();
+    console.log('[AUTH] Inicializando listener de Firebase');
   
+    // Verificar usuario actual inmediatamente
     if (auth.currentUser) {
+      console.log('[AUTH] Usuario encontrado en carga inicial:', auth.currentUser.email);
       setCurrentUser(auth.currentUser);
     }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
+      console.log('[AUTH] Cambio de estado de autenticación:', user ? user.email : 'null');
+      setCurrentUser(user);
     });
-  
-    return () => unsubscribe();
+
+    return () => {
+      console.log('[AUTH] Limpiando listener');
+      unsubscribe();
+    };
   }, []);
-  
+
+  console.log({
+    currentUser: currentUser ? currentUser.email : null,
+    hasFile: !!fileMap[selectedDocument?.id],
+    uploading,
+    selectedDocument: selectedDocument?.id
+  });
+
   const handleUpload = async () => {
     if (!selectedDocument || !fileMap?.[selectedDocument?.id]) return;
     setUploading(true);
-  
+
     try {
       if (!currentUser) {
         alert('Sesión expirada. Por favor, vuelve a iniciar sesión.');
@@ -74,35 +90,37 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       
       const token = await currentUser.getIdToken(true);
       console.log('[UPLOAD] Token generado:', token?.slice(0, 10) + '...');
-  
+
       const formData = new FormData();
       formData.append('file', fileMap?.[selectedDocument?.id]);
       formData.append('email', currentUser.email);
-      formData.append('folder', 'documentExamples');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+      formData.append('folder', 'companyDocuments');
+      
+      // Cambiar a endpoint de conversión
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/convert`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
         body: formData
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         console.error('[UPLOAD] Error del servidor:', errorData);
-        throw new Error(errorData.error || 'Error en la subida');
+        throw new Error(errorData.error || 'Error en la conversión/subida');
       }
-  
+
       const result = await response.json();
-      console.log('[UPLOAD] Subida exitosa:', {
+      console.log('[UPLOAD] Conversión y subida exitosa:', {
         url: result.url,
-        size: fileMap?.[selectedDocument?.id].size
+        originalType: fileMap?.[selectedDocument?.id].type
       });
-  
+
       const existing = uploadedDocuments.find(doc =>
         doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
       );
-  
+
       const docData = {
         companyId,
         requiredDocumentId: selectedDocument?.id,
@@ -112,21 +130,21 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         entityName: userCompanyData?.companyName || "Empresa",
         fileURL: result.url,
         fileName: fileMap?.[selectedDocument?.id]?.name,
-        fileType: fileMap?.[selectedDocument?.id]?.type,
+        fileType: "application/pdf",
+        originalFileType: fileMap?.[selectedDocument?.id]?.type,
         fileSize: fileMap?.[selectedDocument?.id]?.size,
         uploadedAt: serverTimestamp(),
         status: "Pendiente de revisión",
         comment,
         expirationDate: selectedDocument.deadline?.date || null,
       };
-  
+
       if (existing) {
         await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);
       } else {
         await addDoc(collection(db, "uploadedDocuments"), docData);
       }
-  
-      // Actualizar lista local
+
       const updatedQuery = query(
         collection(db, "uploadedDocuments"),
         where("companyId", "==", companyId),
@@ -134,7 +152,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
       );
       const updatedSnapshot = await getDocs(updatedQuery);
       setUploadedDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  
+
       setDialogOpen(false);
       setComment("");
       if (onDocumentUploaded) onDocumentUploaded();
@@ -143,6 +161,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         message: error.message,
         stack: error.stack
       });
+      alert(`Error al convertir/subir documento: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -157,15 +176,16 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     setPreviewUrl(url);
     setPreviewOpen(true);
   };
-  console.log({
-    selectedId: selectedDocument?.id,
-    file: fileMap?.[selectedDocument?.id],
-    uploading,
-    currentUser
-  });
+  
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>Documentos Requeridos</Typography>
+      {!currentUser && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <AlertTitle>Error de autenticación</AlertTitle>
+          Debes iniciar sesión para poder subir documentos
+        </Alert>
+      )}
       <Grid container spacing={2}>
         {requiredDocuments.map(doc => {
           const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
@@ -356,10 +376,18 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
           <Button
   onClick={handleUpload}
   variant="contained"
-  disabled={!fileMap?.[selectedDocument?.id] || uploading || !currentUser}
+  disabled={!fileMap[selectedDocument?.id] || uploading || !currentUser}
   startIcon={uploading ? <CircularProgress size={20} /> : null}
+  sx={{
+    '&:disabled': {
+      backgroundColor: 'grey',
+      color: 'text.disabled'
+    }
+  }}
 >
-  {uploading ? "Subiendo..." : "Confirmar"}
+  {!currentUser ? "Inicia sesión primero" : 
+   uploading ? "Subiendo..." : 
+   !fileMap[selectedDocument?.id] ? "Selecciona un archivo" : "Confirmar subida"}
 </Button>
 
         </DialogActions>

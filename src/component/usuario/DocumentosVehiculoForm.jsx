@@ -5,6 +5,7 @@ import {
 import { UploadFile as UploadFileIcon } from "@mui/icons-material";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = null, onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
@@ -50,62 +51,76 @@ export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = 
   }, [selectedDocumentId, requiredDocuments]);
   
 
-  const handleUpload = async () => {
-    if (!selectedDocument || !file) return;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload error");
-      const { url } = await res.json();
+const handleUpload = async () => {
+  const auth = getAuth();
+  console.log('Usuario actual:', auth.currentUser); // Agrega este log
+  
+  if (!auth.currentUser) {
+    alert('Por favor inicia sesión antes de subir documentos');
+    return;
+  }
+  if (!selectedDocument || !file) return;
+  setUploading(true);
+  
+  try {
+    // Verificación de autenticación
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) throw new Error("Autenticación requerida");
 
-      const selectedDocData = requiredDocuments.find(d => d.id === selectedDocument);
-      const existingDoc = uploadedDocuments.find(
-        (doc) => doc.entityId === vehiculo.id && doc.requiredDocumentId === selectedDocument
-      );
-
-      if (existingDoc) {
-        const docRef = doc(db, "uploadedDocuments", existingDoc.id);
-        await updateDoc(docRef, {
-          fileURL: url,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          uploadedAt: serverTimestamp(),
-          status: "Pendiente de revisión",
-          comment: comment || "",
-        });
-      } else {
-        await addDoc(collection(db, "uploadedDocuments"), {
-          companyId,
-          requiredDocumentId: selectedDocument,
-          documentName: selectedDocData?.name || "Documento",
-          entityType: "vehicle",
-          entityId: vehiculo.id,
-          entityName: `${vehiculo.marca} ${vehiculo.modelo} (${vehiculo.patente})`,
-          fileURL: url,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          uploadedAt: serverTimestamp(),
-          status: "Pendiente de revisión",
-          comment: comment || "",
-        });
+    // Conversión a PDF
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/convert`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${await user.getIdToken()}`
       }
+    });
 
-      if (onDocumentUploaded) {
-        onDocumentUploaded(); // 🔥 Actualizar dashboard
-      }
+    if (!response.ok) throw new Error(await response.text());
+    const { url, originalName, pdfName } = await response.json();
 
-      resetForm();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setUploading(false);
-      setConfirmDialogOpen(false);
+    // Guardar en Firestore
+    const docRef = uploadedDocuments.find(d => 
+      d.entityId === vehiculo.id && d.requiredDocumentId === selectedDocument
+    )?.id;
+
+    const docData = {
+      companyId,
+      requiredDocumentId: selectedDocument,
+      documentName: requiredDocuments.find(d => d.id === selectedDocument)?.name || "Documento",
+      entityType: "vehicle",
+      entityId: vehiculo.id,
+      entityName: `${vehiculo.marca} ${vehiculo.modelo} (${vehiculo.patente})`,
+      originalFile: originalName,
+      fileURL: url,
+      fileName: pdfName,
+      fileType: "application/pdf",
+      fileSize: file.size,
+      uploadedAt: serverTimestamp(),
+      status: "Pendiente de revisión",
+      comment: comment || ""
+    };
+
+    if (docRef) {
+      await updateDoc(doc(db, "uploadedDocuments", docRef), docData);
+    } else {
+      await addDoc(collection(db, "uploadedDocuments"), docData);
     }
-  };
+
+    if (onDocumentUploaded) onDocumentUploaded();
+    resetForm();
+    
+  } catch (error) {
+    console.error("Error en handleUpload:", error);
+    alert(`Error al subir documento: ${error.message}`);
+  } finally {
+    setUploading(false);
+    setConfirmDialogOpen(false);
+  }
+};
 
   const resetForm = () => {
     setFile(null);
