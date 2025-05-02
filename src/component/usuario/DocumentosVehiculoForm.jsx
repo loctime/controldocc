@@ -6,6 +6,7 @@ import { UploadFile as UploadFileIcon } from "@mui/icons-material";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = null, onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
