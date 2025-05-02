@@ -3,33 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import morgan from 'morgan';
-import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-
-import { authenticateFirebaseUser } from './middleware/authenticateFirebaseUser.js';
+import './firebase/admin.js';
 import uploadRoutes from './routes/upload.js';
 import authRoutes from './routes/auth.js';
 
-// 🔐 Inicializar Firebase Admin
-import admin from 'firebase-admin';
-config({ path: '.env' });
-
-const firebaseAdminConfig = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-};
-
-if (!firebaseAdminConfig.projectId || !firebaseAdminConfig.clientEmail || !firebaseAdminConfig.privateKey) {
-  console.error('[SERVER] ❌ Faltan variables de entorno para Firebase Admin');
-  process.exit(1);
-}
-
-admin.initializeApp({
-  credential: admin.credential.cert(firebaseAdminConfig)
-});
-console.log('[SERVER] ✅ Firebase Admin inicializado:', firebaseAdminConfig.projectId);
 
 const app = express();
 const port = process.env.PORT || 3001;
