@@ -88,8 +88,7 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
           comment: comment || "",
         });
       } else {
-        // 🔵 Si no existe, crear uno nuevo
-        await addDoc(collection(db, "uploadedDocuments"), {
+        const rawDocData = {
           companyId,
           requiredDocumentId: selectedDocument,
           documentName: selectedDocData?.name || "Documento",
@@ -97,13 +96,20 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
           entityId: persona.id,
           entityName: `${persona.nombre} ${persona.apellido}`,
           fileURL: url,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
+          fileName: file?.name,
+          fileType: file?.type,
+          fileSize: file?.size,
           uploadedAt: serverTimestamp(),
           status: "Pendiente de revisión",
-          comment: comment || "",
-        });
+          comment: comment || ""
+        };
+        
+        const cleanDocData = Object.fromEntries(
+          Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
+        );
+        
+        await addDoc(collection(db, "uploadedDocuments"), cleanDocData);
+        
         
       }
       if (onDocumentUploaded) {

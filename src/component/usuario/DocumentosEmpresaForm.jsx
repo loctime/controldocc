@@ -121,7 +121,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
       );
 
-      const docData = {
+      const rawDocData = {
         companyId,
         requiredDocumentId: selectedDocument?.id,
         documentName: selectedDocument?.name || "Documento",
@@ -138,6 +138,11 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         comment,
         expirationDate: selectedDocument.deadline?.date || null,
       };
+      
+      const docData = Object.fromEntries(
+        Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
+      );
+      
 
       if (existing) {
         await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);

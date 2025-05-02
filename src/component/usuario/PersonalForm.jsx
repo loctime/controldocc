@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 import {
   Box,
   Typography,
@@ -56,15 +57,18 @@ const PersonalForm = () => {
         return;
       }
 
-      const nuevoPersonal = {
+      const rawData = {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim(),
         companyId,
         createdAt: serverTimestamp(),
       };
-
-      await addDoc(collection(db, "personal"), nuevoPersonal);
+      
+      const cleanData = cleanFirestoreData(rawData);
+      
+      await addDoc(collection(db, "personal"), cleanData);
+      
 
       setNombre("");
       setApellido("");

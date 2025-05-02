@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 import {
   Box,
   Typography,
@@ -57,7 +58,7 @@ const VehiculosForm = () => {
         return;
       }
 
-      const nuevoVehiculo = {
+      const rawVehiculo = {
         marca: marca.trim(),
         modelo: modelo.trim(),
         patente: patente.trim(),
@@ -65,9 +66,11 @@ const VehiculosForm = () => {
         companyId,
         createdAt: serverTimestamp(),
       };
-
-      await addDoc(collection(db, "vehiculos"), nuevoVehiculo);
-
+      
+      const cleanVehiculo = cleanFirestoreData(rawVehiculo);
+      
+      await addDoc(collection(db, "vehiculos"), cleanVehiculo);
+      
       setMarca("");
       setModelo("");
       setPatente("");

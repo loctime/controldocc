@@ -1,6 +1,7 @@
 import React, { useState, useContext } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 import {
   Box,
   Typography,
@@ -174,7 +175,7 @@ const PersonalImportForm = () => {
         
         const personalData = csvData[i];
         const newPersonalRef = doc(collection(db, "personal"));
-        batch.set(newPersonalRef, personalData);
+        batch.set(newPersonalRef, cleanFirestoreData(personalData));
         count++;
       }
       
