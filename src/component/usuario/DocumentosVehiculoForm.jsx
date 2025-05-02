@@ -22,7 +22,22 @@ export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = 
 
   const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
+  const [currentUser, setCurrentUser] = useState(null);
 
+  useEffect(() => {
+    const auth = getAuth();
+  
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+    }
+  
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+  
+    return () => unsubscribe();
+  }, []);
+  
   useEffect(() => {
     if (!companyId || !vehiculo) return;
     const fetchDocuments = async () => {
@@ -52,36 +67,28 @@ export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = 
   
 
 const handleUpload = async () => {
-  const auth = getAuth();
-  console.log('Usuario actual:', auth.currentUser); // Agrega este log
-  
-  if (!auth.currentUser) {
+  if (!currentUser) {
     alert('Por favor inicia sesión antes de subir documentos');
     return;
   }
+  
   if (!selectedDocument || !file) return;
   setUploading(true);
   
   try {
-    // Verificación de autenticación
-    const auth = getAuth();
-    const user = auth.currentUser;
-    if (!user) throw new Error("Autenticación requerida");
-
-    // Conversión a PDF
     const formData = new FormData();
     formData.append("file", file);
+  
     const response = await fetch(`${import.meta.env.VITE_API_URL}/api/convert`, {
       method: "POST",
       body: formData,
       headers: {
-        'Authorization': `Bearer ${await user.getIdToken()}`
+        'Authorization': `Bearer ${await currentUser.getIdToken()}`
       }
     });
-
+  
     if (!response.ok) throw new Error(await response.text());
     const { url, originalName, pdfName } = await response.json();
-
     // Guardar en Firestore
     const docRef = uploadedDocuments.find(d => 
       d.entityId === vehiculo.id && d.requiredDocumentId === selectedDocument
