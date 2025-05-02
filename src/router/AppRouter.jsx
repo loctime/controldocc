@@ -1,5 +1,5 @@
 // src/router/AppRouter.jsx
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { CompanyProvider } from "../contexts/company-context";
@@ -16,25 +16,8 @@ import UsuarioDashboard from "../component/usuario/UsuarioDashboard";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useContext(AuthContext);
-  const [userCompanyData, setUserCompanyData] = useState(null);
-  const [isChecking, setIsChecking] = useState(true);
 
-  useEffect(() => {
-    // Verificar si hay datos de empresa en localStorage
-    const storedData = localStorage.getItem("userCompany");
-    if (storedData) {
-      try {
-        setUserCompanyData(JSON.parse(storedData));
-      } catch (error) {
-        console.error("Error parsing userCompany data:", error);
-        localStorage.removeItem("userCompany"); // Limpiar datos corruptos
-      }
-    }
-    setIsChecking(false);
-  }, []);
-
-  // Mostrar indicador de carga mientras verificamos autenticación
-  if (loading || isChecking) {
+  if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -45,41 +28,20 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
-  // Redireccionar a login si no hay autenticación
-  if (!user && !userCompanyData) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Verificar permisos según el tipo de usuario
-  if (user && user.role === "admin") {
-    // Usuario administrador
-    if (!allowedRoles.includes("admin")) {
-      return <Navigate to="/admin/dashboard" replace />;
-    }
-  } else if (userCompanyData) {
-    // Usuario empresa
-    if (!allowedRoles.includes("user")) {
-      return <Navigate to="/usuario/dashboard" replace />;
-    }
-  } else {
-    // No autenticado o rol no reconocido
-    return <Navigate to="/login" replace />;
+  const role = user.role === "DhHkVja" ? "admin" : "user";
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to={`/${role}/dashboard`} replace />;
   }
 
   return children;
 };
 
 const AppRouter = () => {
-  const { user } = useContext(AuthContext);
-  const [userCompanyData, setUserCompanyData] = useState(null);
-
-  useEffect(() => {
-    const storedData = localStorage.getItem("userCompany");
-    if (storedData) {
-      setUserCompanyData(JSON.parse(storedData));
-    }
-  }, []);
-
   return (
     <BrowserRouter>
       <CompanyProvider>
@@ -103,7 +65,6 @@ const AppRouter = () => {
             <Route path="uploaded-documents" element={<AdminUploadedDocumentsPage />} />
           </Route>
 
-          {/* Rutas para usuarios empresa */}
           <Route
             path="/usuario"
             element={

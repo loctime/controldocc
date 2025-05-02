@@ -10,6 +10,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebaseconfig";
+import { signInWithCustomToken } from "firebase/auth";
 
 const ADMIN_ROLE = "DhHkVja"; // Rol de administrador
 
@@ -74,70 +75,38 @@ const Login = () => {
       setError('Por favor completa todos los campos');
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
-      // Primero verificamos que la empresa exista
-      const companyRef = doc(db, "companies", cuit.trim());
-      const companySnap = await getDoc(companyRef);
-
-      if (!companySnap.exists()) {
-        setError("No se encontró ninguna empresa con ese CUIT");
-        setLoading(false);
-        return;
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/custom-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cuit: cuit.trim(), password })
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.error || "Error al autenticar");
       }
-
-      const companyData = companySnap.data();
-      
-      // Buscamos el usuario asociado a esta empresa
-      const usersRef = collection(db, "users");
-      const userQuery = query(usersRef, where("companyId", "==", cuit.trim()));
-      const userSnapshot = await getDocs(userQuery);
-
-      if (userSnapshot.empty) {
-        setError("No hay usuarios asociados a esta empresa");
-        setLoading(false);
-        return;
-      }
-
-      // Verificamos las credenciales
-      let authenticated = false;
-      let userData = null;
-
-      for (const userDoc of userSnapshot.docs) {
-        const user = userDoc.data();
-        // Verificamos la contraseña
-        if (user.password === password) {
-          authenticated = true;
-          userData = user;
-          break;
-        }
-      }
-
-      if (authenticated && userData) {
-        // Guardamos la información en localStorage para la sesión
-        localStorage.setItem('userCompany', JSON.stringify({
-          companyId: cuit.trim(),
-          companyName: companyData.name,
-          userName: userData.name,
-          userRole: userData.role
-        }));
-
-        console.log("Login exitoso como usuario empresa");
-        
-        // Redirigimos al dashboard de usuario y forzamos una recarga
-        // para asegurar que todas las rutas y estados se actualicen correctamente
-        navigate("/usuario/dashboard");
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      } else {
-        setError("Contraseña incorrecta");
-      }
+  
+      const { token } = data;
+  
+      // 🔐 Autenticar con Firebase usando el token personalizado
+      await signInWithCustomToken(auth, token);
+  
+      // Guardar información adicional si querés (opcional)
+      localStorage.setItem("userCompany", JSON.stringify({
+        companyId: cuit.trim()
+      }));
+  
+      navigate("/usuario/dashboard");
+      setTimeout(() => window.location.reload(), 100);
+  
     } catch (err) {
-      console.error("Error en login de usuario:", err);
-      setError("Error al iniciar sesión. Intenta de nuevo.");
+      console.error("Error login usuario empresa:", err);
+      setError(err.message || "Error al iniciar sesión");
     } finally {
       setLoading(false);
     }

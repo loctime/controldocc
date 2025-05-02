@@ -12,38 +12,25 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      const isAdminSession = localStorage.getItem("isAdminSession") === "true";
-
       if (firebaseUser) {
         try {
           const userDocRef = doc(db, "users", firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
 
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              role: isAdminSession ? "admin" : userData.role || "user",
-              companyId: userData.companyId || null,
-            });
-          } else {
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              role: isAdminSession ? "admin" : "user",
-              companyId: null,
-            });
-          }
+          const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+          // 🔐 Extraer rol y companyId del documento de Firestore o fallback
+          firebaseUser.role = userData.role || "user";
+          firebaseUser.companyId = userData.companyId || null;
+
+          setUser(firebaseUser);
         } catch (error) {
           console.error("Error al obtener datos del usuario:", error);
           setUser(null);
         }
       } else {
-        // Usuario no logueado
         setUser(null);
       }
-
       setLoading(false);
     });
 
