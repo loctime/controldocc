@@ -1,22 +1,24 @@
+# Usa una imagen base oficial de Node.js
 FROM node:18
 
-# Instalar herramientas necesarias
+# Instala LibreOffice e ImageMagick para conversiones
 RUN apt-get update && \
     apt-get install -y libreoffice imagemagick && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Establecer directorio de trabajo
+# Establece el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Copiar solo backend
-COPY backend ./backend
+# Copia dependencias y código del backend
 COPY package*.json ./
+COPY backend ./backend
 
-# Instalar dependencias si package.json está en raíz
-RUN cd backend && npm install
+# Instala las dependencias del backend
+WORKDIR /app/backend
+RUN npm install
 
-# Exponer el puerto
+# Expone el puerto 3001 (el que usa tu backend)
 EXPOSE 3001
 
-# Comando para iniciar
-CMD ["node", "backend/server.js"]
+# Comando para iniciar tu servidor
+CMD ["node", "server.js"]
