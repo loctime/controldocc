@@ -7,6 +7,7 @@ import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
+import DocumentCard from "./DocumentCard";
 
 export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = null, onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
@@ -122,7 +123,14 @@ const handleUpload = async () => {
     } else {
       await addDoc(collection(db, "uploadedDocuments"), docData);
     }
-
+    const updatedSnap = await getDocs(query(
+      collection(db, "uploadedDocuments"),
+      where("companyId", "==", companyId),
+      where("entityType", "==", "vehicle"),
+      where("entityId", "==", vehiculo.id)
+    ));
+    setUploadedDocuments(updatedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    
     if (onDocumentUploaded) onDocumentUploaded();
     resetForm();
     
@@ -170,31 +178,27 @@ const handleUpload = async () => {
       {currentStep === "select" && (
         <>
           <Grid container spacing={2}>
-            {requiredDocuments.map(doc => {
-              const status = getDocStatus(doc.id);
-              const vencimientoColor = getDeadlineColor(status?.expirationDate);
-              const canUpload = !status || status.status === "Rechazado";
-              return (
-                <Grid xs={12} sm={6} md={4} key={doc.id}>
-                  <Paper
-                    sx={{ p: 2, cursor: canUpload ? "pointer" : "default", border: selectedDocument === doc.id ? "2px solid #1976d2" : "1px solid #ccc" }}
-                    onClick={() => canUpload && setSelectedDocument(doc.id)}
-                  >
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Typography fontWeight="bold">{doc.name}</Typography>
-                      {status?.status && (
-                        <Chip size="small" label={status.status} color={status.status === "Aprobado" ? "success" : status.status === "Rechazado" ? "error" : "warning"} />
-                      )}
-                    </Box>
-                    {status?.expirationDate && (
-                      <Typography variant="body2" color={vencimientoColor} mt={1}>
-                        Vence: {new Date(status.expirationDate).toLocaleDateString()}
-                      </Typography>
-                    )}
-                  </Paper>
-                </Grid>
-              );
-            })}
+          {requiredDocuments.map(doc => {
+  const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
+  const days = uploaded?.expirationDate
+    ? Math.floor((new Date(uploaded.expirationDate) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <Grid item xs={12} sm={6} md={4} key={doc.id}>
+      <DocumentCard
+        doc={doc}
+        uploaded={uploaded}
+        days={days}
+        onUploadClick={(d) => {
+          setSelectedDocument(d.id);
+          setCurrentStep("upload");
+        }}
+      />
+    </Grid>
+  );
+})}
+
           </Grid>
 
           <Box mt={3} display="flex" justifyContent="flex-end">
