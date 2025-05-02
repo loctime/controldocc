@@ -10,6 +10,7 @@ import {
 } from "@mui/icons-material";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 
 export default function DocumentosPersonalForm({ persona, selectedDocumentId = null,onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
@@ -104,9 +105,7 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
           comment: comment || ""
         };
         
-        const cleanDocData = Object.fromEntries(
-          Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
-        );
+        const cleanDocData = cleanFirestoreData(rawDocData);
         
         await addDoc(collection(db, "uploadedDocuments"), cleanDocData);
         

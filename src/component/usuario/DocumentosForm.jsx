@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 import {
   Box,
   Typography,

@@ -1,6 +1,7 @@
 // DocumentosEmpresaForm.jsx
 import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
   DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography,
@@ -139,9 +140,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
         expirationDate: selectedDocument.deadline?.date || null,
       };
       
-      const docData = Object.fromEntries(
-        Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
-      );
+      const docData = cleanFirestoreData(rawDocData);
       
 
       if (existing) {
