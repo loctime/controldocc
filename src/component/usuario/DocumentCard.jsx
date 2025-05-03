@@ -70,11 +70,7 @@ const DocumentoCard = ({
                 Motivo: {uploaded.adminComment}
               </Typography>
             )}
-            {uploaded.expirationDate && (
-              <Typography variant="caption" display="block">
-                Vence: {new Date(uploaded.expirationDate).toLocaleDateString()}
-              </Typography>
-            )}
+            
           </>
         ) : (
           <Typography variant="body2" color="text.secondary">
@@ -82,11 +78,15 @@ const DocumentoCard = ({
           </Typography>
         )}
 
-        {doc.deadline?.date && (
+        {(uploaded?.status === "Aprobado" && uploaded.expirationDate) ? (
+          <Typography variant="caption" display="block">
+            Vence aprobado: {new Date(uploaded.expirationDate).toLocaleDateString()}
+          </Typography>
+        ) : doc.deadline?.date && (
           <Tooltip title={days <= 0 ? "¡Vencido!" : `Faltan ${days} días`}>
             <Box display="flex" alignItems="center" mt={1}>
               <Typography variant="caption">
-                Vence: {new Date(doc.deadline.date).toLocaleDateString()}
+                Vence requerido: {new Date(doc.deadline.date).toLocaleDateString()}
               </Typography>
               {days !== null && days <= 10 && (
                 <WarningIcon fontSize="small" sx={{ ml: 1 }} color={days <= 0 ? "error" : "warning"} />
@@ -94,6 +94,9 @@ const DocumentoCard = ({
             </Box>
           </Tooltip>
         )}
+
+
+
 
         <Box mt={2}>
           <Button

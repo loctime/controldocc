@@ -8,6 +8,9 @@ import { collection, getDocs, query, where, doc, updateDoc, serverTimestamp, get
 import { useCompany } from '../../contexts/company-context';
 import { AuthContext } from '../../context/AuthContext';
 import { FormControl, InputLabel } from '@mui/material';
+import handleApproveOrReject from './handleApproveOrReject';
+import RevisionDocumentoDialog from './RevisionDocumentoDialog';
+import VistaDocumentoSubido from './VistaDocumentoSubido';
 
 export default function AdminUploadedDocumentsPage() {
   const [documents, setDocuments] = useState([]);
@@ -21,8 +24,8 @@ export default function AdminUploadedDocumentsPage() {
   const [viewFileName, setViewFileName] = useState('');
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [editMode, setEditMode] = useState({});
   const [showSemaphoreInfo, setShowSemaphoreInfo] = useState(false);
+  const [dialogAccion, setDialogAccion] = useState(null); // { tipo: 'aprobar' | 'rechazar', doc }
 
   const { selectedCompanyId } = useCompany();
   const { user } = useContext(AuthContext);
@@ -183,73 +186,55 @@ export default function AdminUploadedDocumentsPage() {
     setOpenDialog(false);
   };
 
-  const handleApprove = async (docId) => {
-    const expirationDate = newExpirationDates[docId];
-    if (!expirationDate) {
-      setToastMessage('Debe ingresar una fecha de vencimiento para aprobar.');
-      setToastOpen(true);
-      return;
-    }
-    try {
-      const adminEmail = user?.email || auth.currentUser?.email || 'Administrador';
-      await updateDoc(doc(db, 'uploadedDocuments', docId), {
-        status: 'Aprobado',
-        expirationDate,
-        reviewedAt: serverTimestamp(),
-        reviewedBy: adminEmail
-      });
-
-      // Actualizar lista
-      const updatedQuery = selectedCompanyId
-        ? query(collection(db, 'uploadedDocuments'), where('companyId', '==', selectedCompanyId))
-        : collection(db, 'uploadedDocuments');
-      const updatedSnapshot = await getDocs(updatedQuery);
-      setDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-      setExpandedRow(null);
-      setEditMode(prev => ({ ...prev, [docId]: false }));
-      setToastMessage('Documento aprobado correctamente');
-      setToastOpen(true);
-    } catch (error) {
-      console.error('Error al aprobar documento:', error);
-      setToastMessage('Error al aprobar documento');
-      setToastOpen(true);
-    }
-  };
-
-  const handleReject = async (docId) => {
+  const handleApproveOrReject = async (docId, tipo) => {
     const comment = adminComments[docId];
-    if (!comment) {
+    const expirationDate = newExpirationDates[docId];
+    const adminEmail = user?.email || auth.currentUser?.email || 'Administrador';
+  
+    if (tipo === 'rechazar' && !comment) {
       setToastMessage('Debe ingresar un comentario para rechazar.');
       setToastOpen(true);
       return;
     }
+  
+    if (tipo === 'aprobar' && !expirationDate) {
+      setToastMessage('Debe ingresar una fecha de vencimiento para aprobar.');
+      setToastOpen(true);
+      return;
+    }
+  
     try {
-      const adminEmail = user?.email || auth.currentUser?.email || 'Administrador';
-      await updateDoc(doc(db, 'uploadedDocuments', docId), {
-        status: 'Rechazado',
-        adminComment: comment,
+      const dataToUpdate = {
+        status: tipo === 'aprobar' ? 'Aprobado' : 'Rechazado',
         reviewedAt: serverTimestamp(),
-        reviewedBy: adminEmail
-      });
-
-      // Actualizar lista
-      const updatedQuery = selectedCompanyId
-        ? query(collection(db, 'uploadedDocuments'), where('companyId', '==', selectedCompanyId))
-        : collection(db, 'uploadedDocuments');
-      const updatedSnapshot = await getDocs(updatedQuery);
-      setDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
+        reviewedBy: adminEmail,
+      };
+  
+      if (tipo === 'rechazar') dataToUpdate.adminComment = comment;
+      if (tipo === 'aprobar') dataToUpdate.expirationDate = expirationDate;
+  
+      await updateDoc(doc(db, 'uploadedDocuments', docId), dataToUpdate);
+  
+      // Actualizar lista local
+      setDocuments(prevDocs =>
+        prevDocs.map(doc =>
+          doc.id === docId
+            ? { ...doc, ...dataToUpdate, reviewedAt: new Date() }
+            : doc
+        )
+      );
+  
       setExpandedRow(null);
-      setEditMode(prev => ({ ...prev, [docId]: false }));
-      setToastMessage('Documento rechazado correctamente');
+      setDialogAccion(null);
+      setToastMessage(`Documento ${tipo === 'aprobar' ? 'aprobado' : 'rechazado'} correctamente`);
       setToastOpen(true);
     } catch (error) {
-      console.error('Error al rechazar documento:', error);
-      setToastMessage('Error al rechazar documento');
+      console.error(`Error al ${tipo} documento:`, error);
+      setToastMessage(`Error al ${tipo} documento`);
       setToastOpen(true);
     }
   };
+  
 
   const formatDate = (date) => {
     if (!date) return '-';
@@ -274,33 +259,7 @@ export default function AdminUploadedDocumentsPage() {
     return 'Vigente';
   };
 
-  const handleToggleEditMode = (docId) => {
-    setEditMode(prev => {
-      const newState = { ...prev, [docId]: !prev[docId] };
-      // Inicializar campos de edición si entramos en modo edición
-      if (newState[docId]) {
-        const doc = documents.find(d => d.id === docId);
-        if (doc) {
-          // Inicializar fecha de vencimiento si existe
-          if (doc.expirationDate) {
-            let formattedDate;
-            if (typeof doc.expirationDate === 'string') {
-              formattedDate = doc.expirationDate.split('T')[0]; // Formato YYYY-MM-DD
-            } else if (doc.expirationDate.seconds) {
-              const date = new Date(doc.expirationDate.seconds * 1000);
-              formattedDate = date.toISOString().split('T')[0];
-            }
-            setNewExpirationDates(prev => ({ ...prev, [docId]: formattedDate }));
-          }
-          // Inicializar comentario si existe
-          if (doc.adminComment) {
-            setAdminComments(prev => ({ ...prev, [docId]: doc.adminComment }));
-          }
-        }
-      }
-      return newState;
-    });
-  };
+  
 
   if (loading) return <Box textAlign="center"><CircularProgress /></Box>;
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -460,11 +419,6 @@ export default function AdminUploadedDocumentsPage() {
                           {expandedRow === doc.id ? <ExpandLess /> : <ExpandMore />}
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Editar estado">
-                        <IconButton onClick={() => handleToggleEditMode(doc.id)} color="primary">
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -485,148 +439,50 @@ export default function AdminUploadedDocumentsPage() {
       boxShadow: 2,
     }}
   >
-<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-  <Typography variant="h5" fontWeight="bold" sx={{ flexGrow: 1, textAlign: 'center' }}>
-    {doc.documentName || 'Documento sin nombre'}
-  </Typography>
-  <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
-    {doc.companyName}
-  </Typography>
-</Box>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Typography variant="h5" fontWeight="bold" sx={{ flexGrow: 1, textAlign: 'center' }}>
+        {doc.documentName || 'Documento sin nombre'}
+      </Typography>
+      <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+        {doc.companyName}
+      </Typography>
+    </Box>
 
-                     
-                     
-                      <Typography variant="h6">Detalles del Documento</Typography>
-                          <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12} md={6}>
-                              <Typography variant="subtitle2">Archivo Subido:</Typography>
-                              {doc.fileURL ? (
-                                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                  <Button 
-                                    variant="outlined" 
-                                    onClick={() => handleViewFile(doc.fileURL, doc.fileName)}
-                                    startIcon={<Visibility />}
-                                  >
-                                    Ver Archivo
-                                  </Button>
-                                  <Button 
-                                    variant="contained" 
-                                    onClick={() => handleDownload(doc.fileURL, doc.fileName)} 
-                                    startIcon={<Download />}
-                                  >
-                                    Descargar
-                                  </Button>
-                                </Box>
-                              ) : (
-                                <Typography variant="body2">No disponible</Typography>
-                              )}
-                            </Grid>
-                            
-                            {editMode[doc.id] && (
-                              <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Cambiar estado:</Typography>
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                  <TextField
-                                    label="Fecha de vencimiento"
-                                    type="date"
-                                    value={newExpirationDates[doc.id] || ''}
-                                    onChange={(e) => setNewExpirationDates(prev => ({ ...prev, [doc.id]: e.target.value }))}
-                                    InputLabelProps={{ shrink: true }}
-                                    fullWidth
-                                    size="small"
-                                    helperText="Requerido para aprobar el documento"
-                                  />
-                                  <TextField
-                                    label="Comentario del administrador"
-                                    multiline
-                                    rows={3}
-                                    value={adminComments[doc.id] || ''}
-                                    onChange={(e) => setAdminComments(prev => ({ ...prev, [doc.id]: e.target.value }))}
-                                    fullWidth
-                                    size="small"
-                                    helperText="Requerido para rechazar el documento"
-                                  />
-                                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                    <Button
-                                      variant="contained"
-                                      color="success"
-                                      startIcon={<CheckCircle />}
-                                      onClick={() => handleApprove(doc.id)}
-                                    >
-                                      Aprobar
-                                    </Button>
-                                    <Button
-                                      variant="contained"
-                                      color="error"
-                                      startIcon={<Cancel />}
-                                      onClick={() => handleReject(doc.id)}
-                                    >
-                                      Rechazar
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      onClick={() => handleToggleEditMode(doc.id)}
-                                    >
-                                      Cancelar
-                                    </Button>
-                                  </Box>
-                                </Box>
-                              </Grid>
-                            )}
-                            
-                            {doc.reviewedAt && !editMode[doc.id] && (
-                              <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle2">Información de revisión:</Typography>
-                                <Box sx={{ mt: 1 }}>
-                                  <Typography variant="body2">
-                                    <strong>Revisado por:</strong> {doc.reviewedBy || 'Administrador'}
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    <strong>Fecha de revisión:</strong> {formatDate(doc.reviewedAt)}
-                                  </Typography>
-                                  {doc.status === 'Aprobado' && (
-                                    <>
-                                      <Typography variant="body2">
-                                        <strong>Fecha de vencimiento:</strong> {formatDate(doc.expirationDate)}
-                                      </Typography>
-                                      {doc.daysRemaining !== null && (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                                          <strong>Estado:</strong>
-                                          <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                                            <FiberManualRecord 
-                                              sx={{ 
-                                                color: theme => theme.palette[getSemaphoreColor(doc.daysRemaining)].main,
-                                                fontSize: '0.8rem',
-                                                mr: 0.5
-                                              }} 
-                                            />
-                                            <Typography variant="body2">
-                                              {doc.daysRemaining} días - {getExpiryStatusText(doc.daysRemaining)}
-                                            </Typography>
-                                          </Box>
-                                        </Box>
-                                      )}
-                                    </>
-                                  )}
-                                  {doc.adminComment && (
-                                    <Typography variant="body2">
-                                      <strong>Comentario:</strong> {doc.adminComment}
-                                    </Typography>
-                                  )}
-                                  <Button 
-                                    variant="outlined" 
-                                    color="primary" 
-                                    sx={{ mt: 1 }}
-                                    onClick={() => handleToggleEditMode(doc.id)}
-                                  >
-                                    Cambiar estado
-                                  </Button>
-                                </Box>
-                              </Grid>
-                            )}
-                          </Grid>
-                        </Box>
-                      </Collapse>
+    <VistaDocumentoSubido
+  fileURL={doc.fileURL}
+  fileName={doc.fileName}
+  uploaderName={doc.uploadedBy}
+  uploaderComment={doc.comment} // ✅ CORREGIDO
+  exampleURL={doc.requiredDocument?.exampleImage}
+  onDownload={() => handleDownload(doc.fileURL, doc.fileName)}
+/>
+
+    {!dialogAccion && (
+  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
+    <Button
+      variant="contained"
+      color="success"
+      startIcon={<CheckCircle />}
+      onClick={() => setDialogAccion({ tipo: 'aprobar', doc })}
+    >
+      Aprobar
+    </Button>
+    <Button
+      variant="contained"
+      color="error"
+      startIcon={<Cancel />}
+      onClick={() => setDialogAccion({ tipo: 'rechazar', doc })}
+    >
+      Rechazar
+    </Button>
+  </Box>
+)}
+
+    {/* Lugar donde irán los botones Aprobar / Rechazar con lógica personalizada */}
+    {/* Esto lo armamos en el siguiente paso según lo que definas */}
+  </Box>
+</Collapse>
+
                     </TableCell>
                   </TableRow>
                 </React.Fragment>
@@ -654,6 +510,26 @@ export default function AdminUploadedDocumentsPage() {
           onClose={() => setToastOpen(false)}
           message={toastMessage || "Operación completada con éxito "}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        />
+        <RevisionDocumentoDialog
+          open={!!dialogAccion}
+          tipo={dialogAccion?.tipo}
+          doc={dialogAccion?.doc}
+          onClose={() => setDialogAccion(null)}
+          onDownload={handleDownload}
+          onViewFile={handleViewFile}
+          expirationDate={newExpirationDates[dialogAccion?.doc?.id] || ''}
+          setExpirationDate={(val) =>
+            setNewExpirationDates(prev => ({ ...prev, [dialogAccion.doc.id]: val }))
+          }
+          comment={adminComments[dialogAccion?.doc?.id] || ''}
+          setComment={(val) =>
+            setAdminComments(prev => ({ ...prev, [dialogAccion.doc.id]: val }))
+          }
+          onConfirm={() => {
+            handleApproveOrReject(dialogAccion.doc.id, dialogAccion.tipo);
+            setDialogAccion(null);
+          }}          
         />
       </Box>
     );

@@ -237,19 +237,19 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
                     </Typography>
                   )}
 
-                  {doc.deadline?.date && (
+                  {!uploaded?.expirationDate && doc.deadline?.date && (
                     <Tooltip title={days <= 0 ? "¡Vencido!" : `Faltan ${days} días`}>
                       <Box display="flex" alignItems="center" mt={1}>
                         <Typography variant="caption">
                           Vence: {new Date(doc.deadline.date).toLocaleDateString()}
                         </Typography>
                         {days !== null && days <= 10 && (
-                          <WarningIcon fontSize="small" sx={{ ml: 1 }}
-                            color={days <= 0 ? "error" : "warning"} />
+                          <WarningIcon fontSize="small" sx={{ ml: 1 }} color={days <= 0 ? "error" : "warning"} />
                         )}
                       </Box>
                     </Tooltip>
                   )}
+
 
                   <Box mt={2}>
                     <Button

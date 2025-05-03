@@ -1,20 +1,15 @@
-// DocumentosPersonalForm.jsx mejorado final
 import React, { useState, useEffect } from "react";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import DocumentCard from "./DocumentCard";
 import {
-  Paper, Typography, Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Tooltip, CircularProgress
+  Paper, Typography, Grid, Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
 } from "@mui/material";
-import {
-  UploadFile as UploadFileIcon,
-  Description as DescriptionIcon,
-  CloudUpload as CloudUploadIcon
-} from "@mui/icons-material";
+import { UploadFile as UploadFileIcon } from "@mui/icons-material";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
-
-export default function DocumentosPersonalForm({ persona, selectedDocumentId = null,onDocumentUploaded = null }) {
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import WarningIcon from "@mui/icons-material/Warning";
+import DocumentCard from "./DocumentCard";
+import { getDeadlineColor } from '../../utils/getDeadlineColor';
+export default function DocumentosPersonalForm({ persona, selectedDocumentId = null, onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
@@ -33,18 +28,13 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
 
   useEffect(() => {
     const auth = getAuth();
-    setCurrentUser(auth.currentUser);
-  
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setCurrentUser(user || null);
-    });
-  
+    if (auth.currentUser) setCurrentUser(auth.currentUser);
+    const unsubscribe = onAuthStateChanged(auth, user => setCurrentUser(user || null));
     return () => unsubscribe();
   }, []);
-  
+
   useEffect(() => {
     if (!companyId || !persona) return;
-  
     const fetchDocuments = async () => {
       const requiredSnap = await getDocs(query(
         collection(db, "requiredDocuments"),
@@ -57,108 +47,93 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
         where("entityType", "==", "employee"),
         where("entityId", "==", persona.id)
       ));
-  
       setRequiredDocuments(requiredSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setUploadedDocuments(uploadedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
-  
     fetchDocuments();
   }, [companyId, persona]);
-  
-  // 🔵 Y luego agregás este segundo useEffect nuevo:
+
   useEffect(() => {
-    if (selectedDocumentId) {
+    if (selectedDocumentId && requiredDocuments.length > 0) {
       setSelectedDocument(selectedDocumentId);
       setCurrentStep("upload");
     }
-  }, [selectedDocumentId]);
-  
+  }, [selectedDocumentId, requiredDocuments]);
+
   const handleUpload = async () => {
+    if (!currentUser) {
+      alert("Por favor inicia sesión antes de subir documentos");
+      return;
+    }
     if (!selectedDocument || !file) return;
     setUploading(true);
+
     try {
-      if (!currentUser) {
-        alert("Sesión expirada. Por favor vuelve a iniciar sesión.");
-        return;
-      }
-  
-      const token = await currentUser.getIdToken();
-  
       const formData = new FormData();
       formData.append("file", file);
-  
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: "POST",
+        body: formData,
         headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+        }
       });
-  
-      if (!res.ok) throw new Error("Upload error");
-      const { url } = await res.json();
-  
-      const selectedDocData = requiredDocuments.find(d => d.id === selectedDocument);
-  
-      const existingDoc = uploadedDocuments.find(
-        (doc) => doc.entityId === persona.id && doc.requiredDocumentId === selectedDocument
-      );
-  
-      if (existingDoc) {
-        const docRef = doc(db, "uploadedDocuments", existingDoc.id);
-        await updateDoc(docRef, {
-          fileURL: url,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          uploadedAt: serverTimestamp(),
-          status: "Pendiente de revisión",
-          comment: comment || "",
-        });
+
+      if (!response.ok) throw new Error(await response.text());
+      const { url, originalName, pdfName } = await response.json();
+
+      const docRef = uploadedDocuments.find(
+        d => d.entityId === persona.id && d.requiredDocumentId === selectedDocument
+      )?.id;
+
+      const selectedDoc = requiredDocuments.find(d => d.id === selectedDocument);
+
+const rawDocData = {
+  companyId,
+  requiredDocumentId: selectedDocument,
+  documentName: selectedDoc?.name || "Documento",
+  entityType: "employee",
+  entityId: persona.id,
+  entityName: `${persona.nombre} ${persona.apellido}`,
+  originalFile: originalName,
+  fileURL: url,
+  fileName: pdfName,
+  fileType: "application/pdf",
+  fileSize: file?.size,
+  uploadedAt: serverTimestamp(),
+  expirationDate: selectedDoc?.deadline?.date || null, // 🔥 ESTO ES CLAVE
+  status: "Pendiente de revisión",
+  comment: comment || ""
+};
+
+
+      const docData = Object.fromEntries(Object.entries(rawDocData).filter(([_, v]) => v !== undefined));
+
+      if (docRef) {
+        await updateDoc(doc(db, "uploadedDocuments", docRef), docData);
       } else {
-        const rawDocData = {
-          companyId,
-          requiredDocumentId: selectedDocument,
-          documentName: selectedDocData?.name || "Documento",
-          entityType: "employee",
-          entityId: persona.id,
-          entityName: `${persona.nombre} ${persona.apellido}`,
-          fileURL: url,
-          fileName: file?.name,
-          fileType: file?.type,
-          fileSize: file?.size,
-          uploadedAt: serverTimestamp(),
-          status: "Pendiente de revisión",
-          comment: comment || ""
-        };
-  
-        const cleanDocData = cleanFirestoreData(rawDocData);
-        await addDoc(collection(db, "uploadedDocuments"), cleanDocData);
+        await addDoc(collection(db, "uploadedDocuments"), docData);
       }
-  
-      if (onDocumentUploaded) {
-        onDocumentUploaded();
-      }
-  
-      const uploadedSnap = await getDocs(query(
+
+      const updatedSnap = await getDocs(query(
         collection(db, "uploadedDocuments"),
         where("companyId", "==", companyId),
         where("entityType", "==", "employee"),
         where("entityId", "==", persona.id)
       ));
-      setUploadedDocuments(uploadedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-  
+      setUploadedDocuments(updatedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      if (onDocumentUploaded) onDocumentUploaded();
       resetForm();
-    } catch (e) {
-      console.error("Error en handleUpload:", e);
-      alert("Error al subir el documento. Intenta nuevamente.");
+    } catch (error) {
+      console.error("Error en handleUpload:", error);
+      alert(`Error al subir documento: ${error.message}`);
     } finally {
       setUploading(false);
       setConfirmDialogOpen(false);
     }
   };
-  
-  
 
   const resetForm = () => {
     setFile(null);
@@ -173,63 +148,44 @@ export default function DocumentosPersonalForm({ persona, selectedDocumentId = n
     setPreviewOpen(true);
   };
 
-  const getDocStatus = (docId) => uploadedDocuments.find(d => d.requiredDocumentId === docId);
-
-  const getDeadlineColor = (expirationDate) => {
-    if (!expirationDate) return "default";
-    const diff = (new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
-    if (diff <= 0) return "error.light";
-    if (diff <= 2) return "error.main";
-    if (diff <= 5) return "error";
-    if (diff <= 15) return "warning";
-    if (diff <= 30) return "info";
-    return "success";
-  };
-
   if (!persona) return null;
 
-  const getDaysToExpire = (doc) => {
-    if (!doc || !doc.expirationDate) return null;
-    const diff = (new Date(doc.expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
-    return Math.floor(diff);
-  };
-  
-    return (
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" mb={2}>Documentos de {persona.nombre} {persona.apellido}</Typography>
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h5" mb={2}>Documentos de {persona.nombre} {persona.apellido}</Typography>
 
-        {currentStep === "select" && (
-          <>
-            <Grid container spacing={2}>
-  {requiredDocuments.map(doc => {
-    const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
-    const days = getDaysToExpire(uploaded);
+      {currentStep === "select" && (
+        <>
+          <Grid container spacing={2}>
+            {requiredDocuments.map(doc => {
+              const uploaded = uploadedDocuments.find(up => up.requiredDocumentId === doc.id);
+              const days = uploaded?.expirationDate
+                ? Math.floor((new Date(uploaded.expirationDate) - new Date()) / (1000 * 60 * 60 * 24))
+                : null;
 
-    return (
-      <Grid item xs={12} sm={6} md={4} key={doc.id}>
-        <DocumentCard
-          doc={doc}
-          uploaded={uploaded}
-          days={days}
-          onUploadClick={(d) => {
-            setSelectedDocument(d.id);
-            setCurrentStep("upload");
-          }}
-        />
-      </Grid>
-    );
-  })}
-</Grid>
+              return (
+                <Grid item xs={12} sm={6} md={4} key={doc.id}>
+                  <DocumentCard
+                    doc={doc}
+                    uploaded={uploaded}
+                    days={days}
+                    onUploadClick={(d) => {
+                      setSelectedDocument(d.id);
+                      setCurrentStep("upload");
+                    }}
+                  />
+                </Grid>
+              );
+            })}
+          </Grid>
 
-           
-
-            <Box mt={3} display="flex" justifyContent="flex-end">
-              <Button variant="contained" onClick={() => setCurrentStep("upload")} disabled={!selectedDocument}>
-                Siguiente
-              </Button>
-            </Box>
-          </>
-        )}
+          <Box mt={3} display="flex" justifyContent="flex-end">
+            <Button variant="contained" onClick={() => setCurrentStep("upload")} disabled={!selectedDocument}>
+              Siguiente
+            </Button>
+          </Box>
+        </>
+      )}
 
       {currentStep === "upload" && selectedDocument && (
         <Box>

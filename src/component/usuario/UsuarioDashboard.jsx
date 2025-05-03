@@ -48,9 +48,9 @@ import DocumentosVehiculoForm from "../usuario/DocumentosVehiculoForm";
 import PersonalImportForm from "../usuario/PersonalImportForm";
 import CompanyHeader from './components/CompanyHeader';
 import DocumentosPanel from './components/documentosPanel';
-import EmpresaPanel from './components/EmpresaPanel';
 import PersonalPanel from './components/PersonalPanel';
 import VehiculosPanel from './components/VehiculosPanel';
+import { getDeadlineColor } from '../../utils/getDeadlineColor';
 
 const UsuarioDashboard = () => {
   const userCompanyData = JSON.parse(localStorage.getItem('userCompany'));
@@ -75,16 +75,7 @@ const UsuarioDashboard = () => {
     setTabValue(newValue);
   };
 
-  const getDeadlineColor = (expirationDate) => {
-    if (!expirationDate) return "textSecondary";
-    const diff = (new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
-    if (diff <= 0) return "error.main";
-    if (diff <= 2) return "error.dark";
-    if (diff <= 5) return "warning.main";
-    if (diff <= 15) return "warning.light";
-    if (diff <= 30) return "info.main";
-    return "success.main";
-  };
+ 
   
   const hasWarningsForType = (type) => {
     const requiredForType = requiredDocuments.filter(doc => doc.entityType === type);
@@ -169,8 +160,8 @@ const UsuarioDashboard = () => {
             sx={{ minHeight: 40, py: 0.5 }}
           />
           <Tab
-            icon={<PersonIcon fontSize="small" />}
-            label="PERSONAL"
+            icon={<BusinessIcon fontSize="small" />}
+            label="EMPRESA"
             sx={{ minHeight: 40, py: 0.5 }}
           />
           <Tab
@@ -179,8 +170,8 @@ const UsuarioDashboard = () => {
             sx={{ minHeight: 40, py: 0.5 }}
           />
           <Tab
-            icon={<BusinessIcon fontSize="small" />}
-            label="EMPRESA"
+            icon={<PersonIcon fontSize="small" />}
+            label="PERSONAL"
             sx={{ minHeight: 40, py: 0.5 }}
           />
         </Tabs>
@@ -208,6 +199,8 @@ const UsuarioDashboard = () => {
           hasWarningsForPerson={hasWarningsForPerson}
           refreshUploadedDocuments={refreshUploadedDocuments}
           getDeadlineColor={getDeadlineColor}
+        
+
         />
       )}
       {tabValue === 2 && (
@@ -219,16 +212,8 @@ const UsuarioDashboard = () => {
           getDeadlineColor={getDeadlineColor}
         />
       )}
-      {tabValue === 1 && (
-        <EmpresaPanel
-          company={company || {}}
-          personal={personal || []}
-          vehiculos={vehiculos || []}
-          requiredDocuments={requiredDocuments || []}
-          uploadedDocuments={uploadedDocuments || []}
-          onDocumentUploaded={refreshUploadedDocuments}
-        />
-      )}
+      <DocumentosEmpresaForm onDocumentUploaded={refreshUploadedDocuments} />
+
     </Box>
   );
 };

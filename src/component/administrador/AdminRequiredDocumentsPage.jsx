@@ -162,33 +162,31 @@ export default function AdminRequiredDocumentsPage() {
     try {
       setIsUploadingImage(true);
   
-      // ✅ Obtener token del usuario autenticado
+      // Vista previa dinámica
+      if (file.type === "application/pdf") {
+        setImagePreview("/pdf-preview.png"); // 📄 ícono genérico para PDF
+      } else {
+        setImagePreview(URL.createObjectURL(file));
+      }
+  
       const user = getAuth().currentUser;
       const token = user && await user.getIdToken();
-  
-      if (!token) {
-        throw new Error("Usuario no autenticado");
-      }
+      if (!token) throw new Error("Usuario no autenticado");
   
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", "documentExamples");
   
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-  
       const res = await fetch(`${apiUrl}/api/upload`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ Enviar token al backend
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
   
       const data = await res.json();
-  
       if (res.ok) {
-        setExampleImage(data.url);
-        setImagePreview(URL.createObjectURL(file));
+        setExampleImage(data.url); // ✅ URL que se guarda en Firestore
       } else {
         throw new Error(data.message || "Upload failed");
       }
@@ -331,11 +329,12 @@ export default function AdminRequiredDocumentsPage() {
               )}
               <input
                 type="file"
-                accept="image/*"
+                accept=".pdf,image/*"
                 onChange={handleImageUpload}
                 style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                 disabled={isUploadingImage}
               />
+
             </Box>
             {isUploadingImage && (
               <Box display="flex" alignItems="center" gap={1}>

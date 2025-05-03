@@ -7,8 +7,9 @@ import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
+import WarningIcon from "@mui/icons-material/Warning";
 import DocumentCard from "./DocumentCard";
-
+import { getDeadlineColor } from '../../utils/getDeadlineColor';
 export default function DocumentosVehiculoForm({ vehiculo, selectedDocumentId = null, onDocumentUploaded = null }) {
   const [currentStep, setCurrentStep] = useState("select");
   const [requiredDocuments, setRequiredDocuments] = useState([]);
@@ -158,16 +159,6 @@ const handleUpload = async () => {
 
   const getDocStatus = (docId) => uploadedDocuments.find(d => d.requiredDocumentId === docId);
 
-  const getDeadlineColor = (expirationDate) => {
-    if (!expirationDate) return "default";
-    const diff = (new Date(expirationDate) - new Date()) / (1000 * 60 * 60 * 24);
-    if (diff <= 0) return "error.light";
-    if (diff <= 2) return "error.main";
-    if (diff <= 5) return "error";
-    if (diff <= 15) return "warning";
-    if (diff <= 30) return "info";
-    return "success";
-  };
 
   if (!vehiculo) return null;
 
