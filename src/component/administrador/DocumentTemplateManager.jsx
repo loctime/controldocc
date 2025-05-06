@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
-import { useCompany } from "../../contexts/company-context";
+import { useCompany } from "../../contextos/company-context";
 import {
   Box,
   Button,

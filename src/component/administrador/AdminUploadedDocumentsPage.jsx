@@ -5,7 +5,7 @@ import { Box, Typography, Table, Select, MenuItem, TableBody, TableCell, TableCo
 import { ExpandMore, ExpandLess, CheckCircle, Cancel, Download, Edit, Visibility, FiberManualRecord } from '@mui/icons-material';
 import { db, auth } from '../../firebaseconfig';
 import { collection, getDocs, query, where, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { useCompany } from '../../contexts/company-context';
+import { useCompany } from '../../contextos/company-context';
 import { AuthContext } from '../../context/AuthContext';
 import { FormControl, InputLabel } from '@mui/material';
 import handleApproveOrReject from './handleApproveOrReject';

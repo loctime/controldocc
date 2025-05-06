@@ -1,18 +1,20 @@
-import React, { useState, useContext } from 'react';
-import { CompanyProvider, CompanyContext } from '../../contexts/company-context';
+// src/component/administrador/AdminPage.jsx
+import React, { useState } from 'react';
+import { CompanyProvider, useCompany } from '../../contextos/company-context'; // ✅ reemplazo correcto
 import AdminCompanySelector from './AdminCompanySelector';
 import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
 import AdminRequiredDocumentsPage from './AdminRequiredDocumentsPage';
+import DocumentLibraryPage from '../DocumentLibraryPage';
 import { Box, Tabs, Tab, Typography, Paper } from '@mui/material';
-import TaskIcon from '@mui/icons-material/Task';
-import AssignmentIcon from '@mui/icons-material/Assignment';  
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import {
   Dashboard as DashboardIcon,
   Description as DescriptionIcon,
   Business as BusinessIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
+  Folder as FolderIcon,
 } from '@mui/icons-material';
+import { useSearchParams } from 'react-router-dom';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -31,17 +33,21 @@ function TabPanel(props) {
 }
 
 function AdminTabs() {
-  const [tabValue, setTabValue] = useState(0);
-  const { selectedCompany } = useContext(CompanyContext);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = parseInt(searchParams.get('tab')) || 0;
+  const [tabValue, setTabValue] = useState(initialTab);
+  const { selectedCompanyName, selectedCompanyId } = useCompany(); // ✅ correcto uso
 
   const tabConfig = [
     { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
     { icon: <DescriptionIcon />, label: 'Documentos Subidos', content: <AdminUploadedDocumentsPage /> },
     { icon: <AssignmentTurnedInIcon />, label: 'Documentos Requeridos', content: <AdminRequiredDocumentsPage /> },
+    { icon: <FolderIcon />, label: 'Biblioteca de Documentos', content: <DocumentLibraryPage /> }
   ];
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    setSearchParams({ tab: newValue });
   };
 
   return (
@@ -54,9 +60,9 @@ function AdminTabs() {
         </Tabs>
       </Box>
 
-      {selectedCompany && (
+      {selectedCompanyName && (
         <Typography variant="subtitle1" sx={{ mt: 2 }}>
-          Empresa seleccionada: <strong>{selectedCompany.name}</strong> (CUIT: {selectedCompany.cuit})
+          Empresa seleccionada: <strong>{selectedCompanyName}</strong> (ID: {selectedCompanyId})
         </Typography>
       )}
 

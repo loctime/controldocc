@@ -1,5 +1,4 @@
 import React from 'react';
-import { useCompany } from '../../contextos/company-context';
 import { useCompanyList } from '../../contextos/company-list-context';
 import {
   Box,
@@ -13,6 +12,7 @@ import {
   Alert
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
+import { useCompany } from '../../contextos/company-context';
 
 const AdminCompanySelector = () => {
   const { companies, loading, error } = useCompanyList();

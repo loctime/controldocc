@@ -2,9 +2,9 @@
 import React, { useContext } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import { CompanyProvider } from "../contexts/company-context";
+import { CompanyProvider } from "../contextos/company-context";
 import { Box, Typography, CircularProgress } from "@mui/material";
-
+import DocumentLibraryPage from "../component/administrador/DocumentLibraryPage";
 // Componentes
 import Login from "../component/login/Login";
 import AdminLayout from "../component/administrador/AdminLayout";
@@ -63,6 +63,7 @@ const AppRouter = () => {
             <Route path="companies" element={<AdminCompaniesPage />} />
             <Route path="required-documents" element={<AdminRequiredDocumentsPage />} />
             <Route path="uploaded-documents" element={<AdminUploadedDocumentsPage />} />
+            <Route path="document-library" element={<DocumentLibraryPage />} />
           </Route>
 
           <Route

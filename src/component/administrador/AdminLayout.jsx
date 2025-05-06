@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useCompany } from "../../contexts/company-context";
+import { useCompany } from "../../contextos/company-context";
 import { db, auth } from "../../firebaseconfig";
 import { collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { styled, useTheme } from "@mui/material/styles";
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 
 import {
   Box,
@@ -45,28 +44,27 @@ import {
   Logout as LogoutIcon,
 } from "@mui/icons-material";
 
-const drawerWidth = 240;
+const drawerWidth = 180;
 
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
     flexGrow: 1,
-    padding: theme.spacing(3),
+    padding: theme.spacing(1.5),      // Reduce espacio interno
+    width: '100%',
     transition: theme.transitions.create('margin', {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
     }),
     marginLeft: `-${drawerWidth}px`,
     ...(open && {
-      transition: theme.transitions.create('margin', {
-        easing: theme.transitions.easing.easeOut,
-        duration: theme.transitions.duration.enteringScreen,
-      }),
       marginLeft: 0,
     }),
     backgroundColor: theme.palette.grey[100],
     minHeight: '100vh',
   }),
 );
+
+
 
 const AppBarStyled = styled(AppBar, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
@@ -184,6 +182,12 @@ try {
       path: '/admin/uploaded-documents',
       highlight: true // Marcamos esta opción para destacarla
     },
+    { 
+      text: 'Biblioteca de Documentos', 
+      icon: <LibraryBooksIcon />, 
+      path: '/admin/document-library',
+      highlight: true 
+    }
    
   ];
 

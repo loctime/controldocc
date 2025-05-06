@@ -2,13 +2,13 @@
 // Simplemente reexporta el contexto en inglés
 
 import { 
-  SelectedCompanyContext, 
   useSelectedCompany, 
-  SelectedCompanyProvider 
-} from '../contexts/selected-company-context';
+  SelectedCompanyProvider,
+  SelectedCompanyContext
+} from '../contextos/company-context';
 
 export { 
-  SelectedCompanyContext, 
   useSelectedCompany, 
-  SelectedCompanyProvider 
+  SelectedCompanyProvider,
+  SelectedCompanyContext
 };

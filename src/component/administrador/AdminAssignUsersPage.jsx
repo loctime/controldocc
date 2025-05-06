@@ -21,7 +21,7 @@ export default function AdminAssignUsersPage() {
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const { selectedCompanyId } = useCompany();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -109,7 +109,7 @@ export default function AdminAssignUsersPage() {
               <FormControl fullWidth>
                 <InputLabel id="company-select-label">Todas las empresas</InputLabel>
                 <Select
-                  labelId="company-select-label"  
+                  labelId="company-select-label" 
                   value={selectedCompanyId}
                   onChange={(e) => setSelectedCompanyId(e.target.value)}
                   label="Todas las empresas"

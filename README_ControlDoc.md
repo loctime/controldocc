@@ -110,21 +110,20 @@ npm run dev:backend
 ## 📂 Estructura recomendada
 
 ```
-controldoc/
-├── Dockerfile
-├── server.js
-├── .env
-├── .dockerignore
-├── .gitignore
-├── package.json
-├── frontend/
-│   └── vite.config.js
-├── src/
-│   ├── services/
-│   │   └── backblazeService.js
-│   └── uploadconvert/
-│       ├── upload/
-│       └── converted/
+src/
+├── components/
+│   ├── administrador/
+│   │   ├── dialogs/            # Diálogos modales
+│   │   │   ├── SaveTemplateDialog.jsx
+│   │   │   └── ...
+│   │   ├── AdminRequiredDocumentsPage.jsx
+│   │   └── AdminAssignUsersPage.jsx
+├── services/
+│   ├── backblazeService.js     # Servicio de uploads
+│   └── templateService.js      # Lógica de plantillas
+├── uploadconvert/
+│   ├── upload/
+│   └── converted/
 ```
 
 ---

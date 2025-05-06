@@ -8,6 +8,7 @@ import path from 'path';
 import './firebase/admin.js';
 import uploadRoutes from './routes/upload.js';
 import authRoutes from './routes/auth.js';
+import downloadRoute from './routes/download.js';
 
 
 const app = express();
@@ -38,6 +39,7 @@ app.get('/api/ping', (req, res) => {
 // 📦 Rutas externas
 app.use('/api', uploadRoutes(upload));
 app.use('/api', authRoutes); // /api/custom-login
+app.use('/api', downloadRoute);
 
 // 🚀 Iniciar servidor
 app.listen(port, () => {

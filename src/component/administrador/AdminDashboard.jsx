@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { useCompany } from "../../contexts/company-context";
+import { useCompany } from "../../contextos/company-context";
 import { 
   Box, 
   Typography, 
@@ -25,7 +25,7 @@ import {
 } from "@mui/icons-material";
 
 export default function AdminDashboard() {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompanyName } = useCompany();
   const [stats, setStats] = useState({
     requiredDocuments: 0,
     uploadedDocuments: 0,
