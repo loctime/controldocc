@@ -98,15 +98,56 @@ const DocumentoCard = ({
 
 
 
-        <Box mt={2}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => onUploadClick(doc)}
+<Box mt={2}>
+          <Tooltip
+            title={
+              !uploaded
+                ? "Subir nuevo documento"
+                : uploaded.status === "Aprobado"
+                  ? "Documento aprobado. Podés subir uno nuevo si querés actualizarlo."
+                  : "Reemplazar el documento existente"
+            }
           >
-            {uploaded ? "Reemplazar" : "Subir"}
-          </Button>
+            <Box mt={2}>
+  <Tooltip
+    title={
+      !uploaded
+        ? "Subir nuevo documento"
+        : uploaded.status === "Aprobado"
+          ? "Documento aprobado. Podés subir uno nuevo si querés actualizarlo."
+          : "Reemplazar el documento existente"
+    }
+  >
+    <Button
+      variant="outlined"
+      size="small"
+      onClick={() => {
+        if (
+          uploaded?.status === "Aprobado" &&
+          days !== null &&
+          days > 15
+        ) {
+          const confirmar = window.confirm(
+            `Este documento fue aprobado y faltan ${days} días para su vencimiento.\n¿Deseás subir uno nuevo de todas formas?`
+          );
+          if (!confirmar) return;
+        }
+
+        onUploadClick(doc);
+      }}
+    >
+      {!uploaded
+        ? "Subir"
+        : uploaded.status === "Aprobado"
+          ? "Subir de nuevo"
+          : "Reemplazar"}
+    </Button>
+  </Tooltip>
+</Box>
+
+          </Tooltip>
         </Box>
+
       </CardContent>
     </Card>
   );

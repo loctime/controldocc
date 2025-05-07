@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import {
   Box,
   Typography,
-  Button,
   Grid,
   Dialog,
   DialogTitle,
   DialogContent,
   Paper
 } from '@mui/material';
-import { Download } from '@mui/icons-material';
+import DownloadButton from '../../components/common/DownloadButton';
 
 export default function VistaDocumentoSubido({
   fileURL,
@@ -124,14 +123,11 @@ export default function VistaDocumentoSubido({
           </Grid>
         )}
       </Grid>
-      <Button
-        variant="outlined"
-        startIcon={<Download />}
-        onClick={onDownload}
-        sx={{ mb: 2 }}
-      >
-        Descargar archivo
-      </Button>
+      <DownloadButton
+  url={fileURL}
+  filename={fileName || 'documento.pdf'}
+  label="Descargar archivo"
+/>
 
       <Dialog open={modalOpen} onClose={handleCloseModal} maxWidth="md" fullWidth>
         <DialogTitle>Vista completa</DialogTitle>

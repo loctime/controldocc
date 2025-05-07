@@ -1,5 +1,8 @@
 // src/component/administrador/DocumentLibraryPage.jsx
 import React, { useEffect, useState, useContext } from 'react';
+
+import { useDocumentAll } from './Library/DocumentAll';
+
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, IconButton, Button, TextField,
@@ -30,9 +33,6 @@ import DocumentTable from './Library/DocumentTable';
 const ADMIN_ROLE = "DhHkVja";
 
 export default function DocumentLibraryPage() {
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [viewFileUrl, setViewFileUrl] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [viewFileName, setViewFileName] = useState('');
@@ -41,17 +41,12 @@ export default function DocumentLibraryPage() {
   const { selectedCompanyId, setSelectedCompanyId } = useCompany();
   const { user } = useContext(AuthContext);
   const [companies, setCompanies] = useState([]);
+  
 
   // 🔐 Check admin role
   const isAdmin = user?.role === ADMIN_ROLE || user?.email === "fe.rv@hotmail.com";
   
-  // Show error if not admin
-  useEffect(() => {
-    if (!isAdmin) {
-      setError('No tienes permisos para acceder a esta sección');
-      setLoading(false);
-    }
-  }, [isAdmin]);
+ 
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -62,15 +57,15 @@ export default function DocumentLibraryPage() {
     usuarioEmail: '',
   });
   const [showFilters, setShowFilters] = useState(false);
-  
+  const [lastApiCall, setLastApiCall] = useState(0);
+  const API_CALL_DELAY = 2000;
+
+
   // Estados para el gestor de archivos
   const [viewMode, setViewMode] = useState('list'); // 'list' o 'grid'
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [currentFolder, setCurrentFolder] = useState('root');
-  const [folderStructure, setFolderStructure] = useState({
-    root: { name: 'Raíz', files: [], subfolders: ['aprobados', 'rechazados', 'pendientes'] }
-  });
-  const [breadcrumbs, setBreadcrumbs] = useState([{ id: 'root', name: 'Biblioteca' }]);
+  const [currentFolder, setCurrentFolder] = useState('biblioteca');
+  const [breadcrumbs, setBreadcrumbs] = useState([{ id: 'biblioteca', name: 'Biblioteca' }]);
   const [contextMenu, setContextMenu] = useState(null);
   const [fileDetailsOpen, setFileDetailsOpen] = useState(false);
   const [selectedFileDetails, setSelectedFileDetails] = useState(null);
@@ -81,227 +76,56 @@ export default function DocumentLibraryPage() {
     { id: 'company', name: 'Empresa', color: '#ff9800' },
   ]);
   const [selectedCategory, setSelectedCategory] = useState('');
-  // Variables de estado para la creación de carpetas eliminadas
-  const [sortBy, setSortBy] = useState('date'); // 'name', 'date', 'size', 'type'
-  const [sortDirection, setSortDirection] = useState('desc'); // 'asc', 'desc'
-  const [lastApiCall, setLastApiCall] = useState(0);
-  const API_CALL_DELAY = 1000; // 1 second between API calls
+ const [sortBy, setSortBy] = useState('date');
+const [sortDirection, setSortDirection] = useState('desc');
 
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const companiesSnapshot = await getDocs(collection(db, 'companies'));
-        const companiesList = companiesSnapshot.docs.map(doc => {
-          const companyData = {
-            id: doc.id,
-            name: doc.data().name || 'Empresa sin nombre'
-          };
-          console.log('Empresa cargada:', companyData);
-          return companyData;
-        });
-        console.log('Total de empresas cargadas:', companiesList.length);
-        setCompanies(companiesList); // ✅ esta línea es clave
-      } catch (err) {
-        console.error('Error al cargar empresas:', err);
-      }
-    };
-  
-    fetchCompanies();
-  }, []);
+const sortDocuments = (docs, sortBy, sortDirection) => {
+  return [...docs].sort((a, b) => {
+    let valA = a[sortBy] || '';
+    let valB = b[sortBy] || '';
+    if (valA instanceof Date) valA = valA.getTime();
+    if (valB instanceof Date) valB = valB.getTime();
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
 
-  useEffect(() => {
-    // Cargar documentos reales de Firestore
-    fetchRealDocuments();
-  }, [selectedCompanyId]); // Ahora se recarga cuando cambia la empresa seleccionada
-  
-  // Función para cargar solo documentos aprobados de Firestore
-  const fetchRealDocuments = async () => {
-    if (!isAdmin) return;
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      // Validate environment variables
-      if (!import.meta.env.VITE_API_URL) {
-        throw new Error('Configuration error: Missing API URL');
-      }
-      
-      
-      // Add input validation for companyId
-      if (selectedCompanyId && typeof selectedCompanyId !== 'string') {
-        throw new Error('Invalid company ID format');
-      }
-      
-      console.log('Cargando documentos aprobados...');
-      // Consultar documentos aprobados y filtrar por empresa si corresponde
-      let docsQuery;
-      if (selectedCompanyId) {
-        docsQuery = query(
-          collection(db, 'uploadedDocuments'),
-          where('status', '==', 'Aprobado'),
-          where('companyId', '==', selectedCompanyId)
-        );
-      } else {
-        docsQuery = query(
-          collection(db, 'uploadedDocuments'),
-          where('status', '==', 'Aprobado')
-        );
-      }
-      // Obtener documentos aprobados (filtrados por empresa si corresponde)
-      const snapshot = await getDocs(docsQuery);
-      
-      // Obtener mapa de empresas para mostrar nombres en lugar de IDs
-      const companiesSnapshot = await getDocs(collection(db, 'companies'));
-      const companiesMap = {};
-      companiesSnapshot.forEach(doc => {
-        companiesMap[doc.id] = doc.data().name;
-      });
-      
-      // Procesar documentos
-      const loadedDocuments = snapshot.docs.map(docSnap => {
-        const data = docSnap.data();  
-        
-        // Calcular días restantes si hay fecha de vencimiento
-        let daysRemaining = null;
-        if (data.expirationDate) {
-          const today = new Date();
-          let expiryDate;
-          
-          if (typeof data.expirationDate === 'string') {
-            expiryDate = new Date(data.expirationDate);
-          } else if (data.expirationDate.seconds) {
-            expiryDate = new Date(data.expirationDate.seconds * 1000);
-          }
-      
-          if (expiryDate) {
-            const diffTime = expiryDate - today;
-            daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          }
-        }
-        
-        // Determinar tamaño aproximado del archivo (si no existe)
-        const fileSize = data.fileSize || Math.floor(Math.random() * 5000000) + 500000; // Entre 500KB y 5MB
-        
-        // Determinar categoría basada en el tipo de documento
-        let category = 'company';
-        if (data.documentType === 'personal') {
-          category = 'personal';
-        } else if (data.documentType === 'vehicle') {
-          category = 'vehicle';
-        } else if (data.status === 'Aprobado') {
-          category = 'important';
-        }
-        
-        // Asegurarse de que companyId sea una cadena de texto
-        const companyId = data.companyId ? String(data.companyId) : '';
-        
-        return {
-          id: docSnap.id,
-          nombreOriginal: data.fileName || data.documentName || 'Documento sin nombre',
-          companyId: companyId,
-          companyName: companiesMap[companyId] || companyId || 'Sin empresa',
-          usuarioEmail: data.userEmail || data.uploadedBy || 'Usuario desconocido',
-          originalStatus: data.status || 'Pendiente de revisión',
-          tipo: data.fileType || data.contentType || 'application/pdf',
-          fechaSubida: data.uploadedAt?.toDate() || data.createdAt?.toDate() || new Date(),
-          addedToLibraryAt: data.uploadedAt?.toDate() || data.createdAt?.toDate() || new Date(),
-          urlB2: data.fileURL || data.downloadURL || '',
-          size: fileSize,
-          category: category,
-          starred: data.status === 'Aprobado' && daysRemaining !== null && daysRemaining <= 30, // Marcar como favorito si está por vencer
-          tags: data.tags || [],
-          daysRemaining: daysRemaining
-        };
-      });
-      
-      console.log('Documentos aprobados cargados:', loadedDocuments.length);
-      console.log('Ejemplo de documento:', loadedDocuments.length > 0 ? loadedDocuments[0] : 'No hay documentos');
-      if (loadedDocuments.length > 0) {
-        console.log('CompanyId del primer documento:', loadedDocuments[0].companyId);
-        console.log('Tipo de dato de companyId:', typeof loadedDocuments[0].companyId);
-      }
-      
-      // Organizar solo documentos aprobados en la carpeta 'aprobados'
-      const folderStructureTemp = {
-        aprobados: { name: 'Aprobados', files: loadedDocuments, subfolders: [] }
-      };
-      setFolderStructure(folderStructureTemp);
+    return sortDirection === 'asc'
+      ? valA > valB ? 1 : -1
+      : valA < valB ? 1 : -1;
+  });
+};
 
-      // Mostrar siempre la carpeta de aprobados en la biblioteca
-      let docsInCurrentFolder = folderStructureTemp.aprobados.files;
-      
 
-      
-      // Filtrar por categoría si está seleccionada
-      if (selectedCategory) {
-        docsInCurrentFolder = docsInCurrentFolder.filter(doc => {
-          const docCategory = String(doc.category || '');
-          const filterCategory = String(selectedCategory || '');
-          return docCategory === filterCategory;
-        });
-      }
-      
-      // Ordenar documentos
-      const sortedDocs = sortDocuments(docsInCurrentFolder, sortBy, sortDirection);
-      
-      setDocuments(sortedDocs);
-    } catch (err) {
-      console.error('Error loading documents:', {
-        error: err,
-        timestamp: new Date().toISOString(),
-        userId: user?.uid,
-        companyId: selectedCompanyId 
-      });
-      
-      setError(getFriendlyErrorMessage(err.message || 'Error al cargar documentos'));
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Ordenar documentos
-  const sortDocuments = (docs, sortField, direction) => {
-    return [...docs].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortField) {
-        case 'name':
-          comparison = a.nombreOriginal.localeCompare(b.nombreOriginal);
-          break;
-        case 'date':
-          comparison = new Date(a.fechaSubida) - new Date(b.fechaSubida);
-          break;
-        case 'size':
-          comparison = a.size - b.size;
-          break;
-        case 'type':
-          comparison = a.tipo.localeCompare(b.tipo);
-          break;
-        default:
-          comparison = new Date(a.fechaSubida) - new Date(b.fechaSubida);
-      }
-      
-      return direction === 'asc' ? comparison : -comparison;
-    });
-  };
+const {
+  documents,
+  setDocuments,
+  folderStructure,
+  loading,
+  error
+} = useDocumentAll({
+  isAdmin,
+  selectedCompanyId,
+  selectedCategory,
+  sortDocuments,
+  sortBy,
+  sortDirection
+});
   
   // Navegar a una carpeta
   const navigateToFolder = (folderId) => {
     setCurrentFolder(folderId);
     
     // Actualizar las migas de pan
-    if (folderId === 'root') {
-      setBreadcrumbs([{ id: 'root', name: 'Biblioteca' }]);
+    if (folderId === 'biblioteca') {
+      setBreadcrumbs([{ id: 'biblioteca', name: 'Biblioteca' }]);
     } else {
       setBreadcrumbs([
-        { id: 'root', name: 'Biblioteca' },
-        { id: folderId, name: folderStructure[folderId]?.name || folderId }
+        { id: 'biblioteca', name: 'Biblioteca' },
+        { id: folderId, name: folderId }
       ]);
     }
     
     // Cargar documentos de la carpeta seleccionada
-    const docsInFolder = folderStructure[folderId]?.files || [];
+    const docsInFolder = folderStructure[currentFolder]?.files || [];
     
     // Aplicar filtros actuales
     let filteredDocs = docsInFolder;
@@ -317,16 +141,14 @@ export default function DocumentLibraryPage() {
     }
     
     // Filtrar por empresa si está seleccionada
-    if (selectedCompany) {
+    if (selectedCompanyId) {
       filteredDocs = filteredDocs.filter(doc => {
-        // Comparación más robusta para manejar diferentes tipos de datos
         const docCompanyId = String(doc.companyId || '');
         const filterCompanyId = String(selectedCompanyId || '');
         return docCompanyId === filterCompanyId;
       });
     }
     
-    setDocuments(sortDocuments(filteredDocs, sortBy, sortDirection));
   };
   
   // Seleccionar/deseleccionar un archivo
@@ -486,28 +308,13 @@ export default function DocumentLibraryPage() {
         prev.map(doc => doc.id === fileId ? updatedDoc : doc)
       );
       
-      // Mover el documento a la carpeta correspondiente
-      const updatedFolderStructure = { ...folderStructure };
       
-      // Eliminar de la carpeta actual
-      Object.keys(updatedFolderStructure).forEach(folderId => {
-        if (folderId !== 'root') { // Mantener en la carpeta raíz
-          updatedFolderStructure[folderId].files = updatedFolderStructure[folderId].files.filter(
-            file => file.id !== fileId
-          );
-        }
-      });
       
-      // Añadir a la carpeta correspondiente según el nuevo estado
-      if (newStatus === 'Aprobado') {
-        updatedFolderStructure.aprobados.files.push(updatedDoc);
-      } else if (newStatus === 'Rechazado') {
-        updatedFolderStructure.rechazados.files.push(updatedDoc);
-      } else {
-        updatedFolderStructure.pendientes.files.push(updatedDoc);
-      }
       
-      setFolderStructure(updatedFolderStructure);
+      setDocuments(prev => [...prev, updatedDoc]);
+
+      
+      
       
       setToastMessage(`Estado del documento actualizado a: ${newStatus}`);
       setToastOpen(true);
@@ -567,12 +374,8 @@ export default function DocumentLibraryPage() {
     setLoading(true);
     try {
       // Obtener todos los documentos disponibles en la estructura de carpetas
-      let allDocs = [];
-      Object.keys(folderStructure).forEach(folderId => {
-        if (folderStructure[folderId]?.files && Array.isArray(folderStructure[folderId].files)) {
-          allDocs = [...allDocs, ...folderStructure[folderId].files];
-        }
-      });
+      let allDocs = [...documents];
+
       
       // Filtrar según los criterios de búsqueda
       let filteredDocs = [...allDocs];
@@ -656,9 +459,15 @@ export default function DocumentLibraryPage() {
     });
     setSelectedCompany('');
     setSelectedCategory('');
-    fetchRealDocuments();
   };
-
+  const toggleStarred = (fileId) => {
+    setDocuments(prev =>
+      prev.map(doc =>
+        doc.id === fileId ? { ...doc, starred: !doc.starred } : doc
+      )
+    );
+  };
+  
   const handleViewFile = (url, filename) => {
     const now = Date.now();
     if (now - lastApiCall < API_CALL_DELAY) {
@@ -790,17 +599,18 @@ export default function DocumentLibraryPage() {
       <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-  <Chip
-    label="Todos los documentos"
-    icon={<FolderOpen />}
-    onClick={() => {
-      setSelectedCategory(null);
-      navigateToFolder('root');
-    }}
-    color={currentFolder === 'root' ? 'primary' : 'default'}
-    variant={currentFolder === 'root' ? 'filled' : 'outlined'}
-    clickable
-  />
+        <Chip
+  label="Todos los documentos"
+  icon={<FolderOpen />}
+  onClick={() => {
+    setSelectedCategory(null);
+    navigateToFolder('biblioteca');
+  }}
+  color={currentFolder === 'biblioteca' ? 'primary' : 'default'}
+  variant={currentFolder === 'biblioteca' ? 'filled' : 'outlined'}
+  clickable
+/>
+
   {categories.map((cat) => (
     <Chip
       key={cat.id}
@@ -874,11 +684,9 @@ export default function DocumentLibraryPage() {
       setSelectedCategory={setSelectedCategory}
       sortBy={sortBy}
       sortDirection={sortDirection}
-      folderStructure={folderStructure}
       currentFolder={currentFolder}
       setDocuments={setDocuments}
       sortDocuments={sortDocuments}
-      fetchRealDocuments={fetchRealDocuments}
       showFilters={showFilters}
       handleClearFilters={handleClearFilters}
       handleSearch={handleSearch}
@@ -919,32 +727,16 @@ export default function DocumentLibraryPage() {
             </Paper>
           )}
           
-          {documents.length === 0 && folderStructure[currentFolder]?.subfolders.length === 0 ? (
+          {documents.length === 0 ? (
             <Alert severity="info">No hay documentos ni carpetas en esta ubicación.</Alert>
           ) : (
             <>
               {/* Vista de carpetas */}
-              {folderStructure[currentFolder]?.subfolders.length > 0 && (
+              {documents.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="subtitle1" sx={{ mb: 1 }}>Carpetas</Typography>
                   <Grid container spacing={2}>
-                    {folderStructure[currentFolder].subfolders.map(folderId => (
-                      <Grid item xs={6} sm={6} md={3} lg={2.4} key={folderId}>
-                      <Paper 
-                          sx={{
-                            p: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            '&:hover': { bgcolor: 'action.hover' }
-                          }}
-                          onClick={() => navigateToFolder(folderId)}
-                        >
-                          <FolderOpen color="primary" sx={{ mr: 1, fontSize: 40 }} />
-                          <Typography>{folderStructure[folderId]?.name || folderId}</Typography>
-                        </Paper>
-                      </Grid>
-                    ))}
+                    
                   </Grid>
                 </Box>
               )}
@@ -1273,4 +1065,5 @@ export default function DocumentLibraryPage() {
 
 
   );
+
 }

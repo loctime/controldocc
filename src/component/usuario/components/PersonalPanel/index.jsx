@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { getDeadlineColor } from '../../../../utils/getDeadlineColor';
 import { 
   Paper, Typography, Button, Stack, 
@@ -12,6 +12,7 @@ import PersonalForm from '../../PersonalForm';
 import PersonalImportForm from '../../PersonalImportForm';
 import DocumentosPersonalForm from '../../DocumentosPersonalForm';
 import WarningIcon from '@mui/icons-material/Warning';
+import { AuthContext } from '../../../../context/AuthContext';
 
 
 export default function PersonalPanel({
@@ -26,6 +27,7 @@ export default function PersonalPanel({
   const [selectedPersona, setSelectedPersona] = useState(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [openDocumentosDialog, setOpenDocumentosDialog] = useState(false);
+  const { user: currentUser } = useContext(AuthContext);
 
   return (
     <>
@@ -49,7 +51,7 @@ export default function PersonalPanel({
       {showImportPersonal ? (
         <PersonalImportForm />
       ) : (
-        <PersonalForm />
+        <PersonalForm companyId={currentUser.companyId} />
       )}
       
       <Paper elevation={2} sx={{ p: 3 }}>

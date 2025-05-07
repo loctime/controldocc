@@ -4,17 +4,19 @@ import React, { useEffect, useState, useContext } from 'react';
 import { Box, Typography, Table, Select, MenuItem, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Collapse, Button, TextField, Alert, CircularProgress, Grid, Chip, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Tooltip } from '@mui/material';
 import { ExpandMore, ExpandLess, CheckCircle, Cancel, Download, Edit, Visibility, FiberManualRecord } from '@mui/icons-material';
 import { db, auth } from '../../firebaseconfig';
-import { collection, getDocs, query, where, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, serverTimestamp, getDoc, Timestamp, addDoc } from 'firebase/firestore';
 import { useCompany } from '../../contextos/company-context';
 import { AuthContext } from '../../context/AuthContext';
 import { FormControl, InputLabel } from '@mui/material';
 import handleApproveOrReject from './handleApproveOrReject';
 import RevisionDocumentoDialog from './RevisionDocumentoDialog';
 import VistaDocumentoSubido from './VistaDocumentoSubido';
+import { useSearchParams } from 'react-router-dom';
 
+import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 export default function AdminUploadedDocumentsPage() {
   const [documents, setDocuments] = useState([]);
-  const [expandedRow, setExpandedRow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newExpirationDates, setNewExpirationDates] = useState({});
@@ -26,123 +28,163 @@ export default function AdminUploadedDocumentsPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [showSemaphoreInfo, setShowSemaphoreInfo] = useState(false);
   const [dialogAccion, setDialogAccion] = useState(null); // { tipo: 'aprobar' | 'rechazar', doc }
-
-  const { selectedCompanyId } = useCompany();
+  const documentRefs = useRef({});
+  const { selectedCompanyId, selectCompany } = useCompany();
   const { user } = useContext(AuthContext);
-  const [filterStatus, setFilterStatus] = useState('todos');
+  const [searchParams] = useSearchParams();
+const initialFilter = searchParams.get("filter") || "todos";
+const empresaParam = searchParams.get("empresa");
+const docIdParam = searchParams.get("docId");
+const [expandedRow, setExpandedRow] = useState(docIdParam || null);
+const [localEmpresa, setLocalEmpresa] = useState(null);
+
+  const [filterStatus, setFilterStatus] = useState(initialFilter);
   const [sortOption, setSortOption] = useState('expirationDateAsc');
+// Setear la empresa automáticamente desde la URL (empresaParam)
+const [empresaCargada, setEmpresaCargada] = useState(false);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      setLoading(true);
+useEffect(() => {
+  if (empresaParam) {
+    const fetchCompanyName = async () => {
       try {
-        const docsQuery = selectedCompanyId
-          ? query(collection(db, 'uploadedDocuments'), where('companyId', '==', selectedCompanyId))
-          : collection(db, 'uploadedDocuments');
-
-        const snapshot = await getDocs(docsQuery);
-        const companiesSnapshot = await getDocs(collection(db, 'companies'));
-        const companiesMap = {};
-        companiesSnapshot.forEach(doc => {
-          companiesMap[doc.id] = doc.data().name;
-        });
-
-        const loadedDocuments = await Promise.all(snapshot.docs.map(async (docSnap) => {
-          const data = docSnap.data();
-          let status = data.status;
-          let adminComment = data.adminComment || '';
-        
-          // Obtener documento requerido si existe
-          let requiredDoc = null;
-          if (data.requiredDocumentId) {
-            const requiredDocSnap = await getDoc(doc(db, 'requiredDocuments', data.requiredDocumentId));
-            requiredDoc = requiredDocSnap.exists() ? requiredDocSnap.data() : null;
-          }
-        
-          // Calcular días restantes
-          let daysRemaining = null;
-          if (data.expirationDate) {
-            const today = new Date();
-            let expiryDate;
-            
-            if (typeof data.expirationDate === 'string') {
-              expiryDate = new Date(data.expirationDate);
-            } else if (data.expirationDate.seconds) {
-              expiryDate = new Date(data.expirationDate.seconds * 1000);
-            }
-        
-            if (expiryDate) {
-              const diffTime = expiryDate - today;
-              daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            }
-          }
-        
-          // Si está aprobado pero faltan <= 20 días, volver a Pendiente
-          if (status === 'Aprobado' && daysRemaining !== null && daysRemaining <= 20) {
-            status = 'Pendiente de revisión';
-            adminComment = `Revisión requerida (${daysRemaining} días restantes)`;
-        
-            if (data.status !== status) {
-              await updateDoc(docSnap.ref, {
-                status,
-                adminComment,
-              });
-            }
-          }
-        
-          return {
-            id: docSnap.id,
-            ...data,
-            status,
-            adminComment,
-            daysRemaining,
-            requiredDocument: requiredDoc,
-            companyName: companiesMap[data.companyId] || data.companyId
-          };
-        }));
-        
-        // Ordenar documentos: primero pendientes, luego aprobados por fecha de vencimiento
-        const sortedDocuments = loadedDocuments.sort((a, b) => {
-          // Primero los pendientes
-          if (a.status === 'Pendiente de revisión' && b.status !== 'Pendiente de revisión') return -1;
-          if (a.status !== 'Pendiente de revisión' && b.status === 'Pendiente de revisión') return 1;
-          
-          // Si ambos son aprobados, ordenar por días restantes (menor a mayor)
-          if (a.status === 'Aprobado' && b.status === 'Aprobado') {
-            // Si alguno no tiene días restantes, ponerlo al final
-            if (a.daysRemaining === null && b.daysRemaining !== null) return 1;
-            if (a.daysRemaining !== null && b.daysRemaining === null) return -1;
-            if (a.daysRemaining === null && b.daysRemaining === null) return 0;
-            
-            // Ordenar por días restantes (menor a mayor)
-            return a.daysRemaining - b.daysRemaining;
-          }
-          
-          // Si uno es aprobado y otro rechazado, mostrar aprobados primero
-          if (a.status === 'Aprobado' && b.status === 'Rechazado') return -1;
-          if (a.status === 'Rechazado' && b.status === 'Aprobado') return 1;
-          
-          // Para otros casos, mantener el orden original
-          return 0;
-        });
-
-        setDocuments(sortedDocuments);
-      } catch (err) {
-        console.error(err);
-        setError('Error al cargar documentos.');
-      } finally {
-        setLoading(false);
+        const docSnap = await getDoc(doc(db, "companies", empresaParam));
+        const name = docSnap.exists() ? docSnap.data().name : '';
+        setLocalEmpresa({ id: empresaParam, name });
+        setEmpresaCargada(true);
+      } catch (error) {
+        console.error("Error al cargar empresa desde la URL:", error);
+        setEmpresaCargada(true);
       }
     };
+    fetchCompanyName();
+  } else {
+    setEmpresaCargada(true);
+  }
+}, [empresaParam]);
 
-    fetchDocuments();
-  }, [selectedCompanyId]);
 
-  const handleExpandRow = (id) => {
+
+
+const fetchDocuments = async () => {
+  setLoading(true);
+  try {
+    const docsQuery = selectedCompanyId
+      ? query(collection(db, 'uploadedDocuments'), where('companyId', '==', selectedCompanyId))
+      : collection(db, 'uploadedDocuments');
+
+    const snapshot = await getDocs(docsQuery);
+    const companiesSnapshot = await getDocs(collection(db, 'companies'));
+    const companiesMap = {};
+    companiesSnapshot.forEach(doc => {
+      companiesMap[doc.id] = doc.data().name;
+    });
+
+    const loadedDocuments = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      let status = data.status;
+      let adminComment = data.adminComment || '';
+    
+      // Obtener documento requerido si existe
+      let requiredDoc = null;
+      if (data.requiredDocumentId) {
+        const requiredDocSnap = await getDoc(doc(db, 'requiredDocuments', data.requiredDocumentId));
+        requiredDoc = requiredDocSnap.exists() ? requiredDocSnap.data() : null;
+      }
+    
+      // Calcular días restantes
+      let daysRemaining = null;
+      if (data.expirationDate) {
+        const today = new Date();
+        let expiryDate;
+        
+        if (typeof data.expirationDate === 'string') {
+          expiryDate = new Date(data.expirationDate);
+        } else if (data.expirationDate.seconds) {
+          expiryDate = new Date(data.expirationDate.seconds * 1000);
+        }
+    
+        if (expiryDate) {
+          const diffTime = expiryDate - today;
+          daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+      }
+    
+      // Si está aprobado pero faltan <= 20 días, volver a Pendiente
+      if (status === 'Aprobado' && daysRemaining !== null && daysRemaining <= 20) {
+        status = 'Pendiente de revisión';
+        adminComment = `Revisión requerida (${daysRemaining} días restantes)`;
+    
+        if (data.status !== status) {
+          await updateDoc(docSnap.ref, {
+            status,
+            adminComment,
+          });
+        }
+      }
+    
+      return {
+        id: docSnap.id,
+        ...data,
+        status,
+        adminComment,
+        daysRemaining,
+        requiredDocument: requiredDoc,
+        companyName: companiesMap[data.companyId] || data.companyId
+      };
+    }));
+    
+    // Ordenar documentos: primero pendientes, luego aprobados por fecha de vencimiento
+    const sortedDocuments = loadedDocuments.sort((a, b) => {
+      // Primero los pendientes
+      if (a.status === 'Pendiente de revisión' && b.status !== 'Pendiente de revisión') return -1;
+      if (a.status !== 'Pendiente de revisión' && b.status === 'Pendiente de revisión') return 1;
+      
+      // Si ambos son aprobados, ordenar por días restantes (menor a mayor)
+      if (a.status === 'Aprobado' && b.status === 'Aprobado') {
+        // Si alguno no tiene días restantes, ponerlo al final
+        if (a.daysRemaining === null && b.daysRemaining !== null) return 1;
+        if (a.daysRemaining !== null && b.daysRemaining === null) return -1;
+        if (a.daysRemaining === null && b.daysRemaining === null) return 0;
+        
+        // Ordenar por días restantes (menor a mayor)
+        return a.daysRemaining - b.daysRemaining;
+      }
+      
+      // Si uno es aprobado y otro rechazado, mostrar aprobados primero
+      if (a.status === 'Aprobado' && b.status === 'Rechazado') return -1;
+      if (a.status === 'Rechazado' && b.status === 'Aprobado') return 1;
+      
+      // Para otros casos, mantener el orden original
+      return 0;
+    });
+
+    setDocuments(sortedDocuments);
+  } catch (err) {
+    console.error(err);
+    setError('Error al cargar documentos.');
+  } finally {
+    setLoading(false);
+  }
+};
+useEffect(() => {
+  if (!empresaCargada) return;
+  fetchDocuments();
+}, [selectedCompanyId, empresaCargada]);
+useEffect(() => {
+  if (docIdParam && documentRefs.current[docIdParam]) {
+    documentRefs.current[docIdParam].scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+}, [docIdParam, documents]);
+
+
+const handleExpandRow = (id) => {
     setExpandedRow(prev => (prev === id ? null : id));
   };
 
-  const handleDownload = async (url, filename) => {
+          const handleDownload = async (url, filename) => {
     if (!url) {
       setToastMessage('No se encontró el archivo para descargar.');
       setToastOpen(true);
@@ -174,66 +216,20 @@ export default function AdminUploadedDocumentsPage() {
   };
 
 
-  const handleViewFile = (url, filename) => {
+          const handleViewFile = (url, filename) => {
     setViewFileUrl(url);
     setViewFileName(filename);
     setOpenDialog(true);
   };
 
-  const handleCloseDialog = () => {
+          const handleCloseDialog = () => {
     setViewFileUrl('');
     setViewFileName('');
     setOpenDialog(false);
   };
 
-  const handleApproveOrReject = async (docId, tipo) => {
-    const comment = adminComments[docId];
-    const expirationDate = newExpirationDates[docId];
-    const adminEmail = user?.email || auth.currentUser?.email || 'Administrador';
   
-    if (tipo === 'rechazar' && !comment) {
-      setToastMessage('Debe ingresar un comentario para rechazar.');
-      setToastOpen(true);
-      return;
-    }
   
-    if (tipo === 'aprobar' && !expirationDate) {
-      setToastMessage('Debe ingresar una fecha de vencimiento para aprobar.');
-      setToastOpen(true);
-      return;
-    }
-  
-    try {
-      const dataToUpdate = {
-        status: tipo === 'aprobar' ? 'Aprobado' : 'Rechazado',
-        reviewedAt: serverTimestamp(),
-        reviewedBy: adminEmail,
-      };
-  
-      if (tipo === 'rechazar') dataToUpdate.adminComment = comment;
-      if (tipo === 'aprobar') dataToUpdate.expirationDate = expirationDate;
-  
-      await updateDoc(doc(db, 'uploadedDocuments', docId), dataToUpdate);
-  
-      // Actualizar lista local
-      setDocuments(prevDocs =>
-        prevDocs.map(doc =>
-          doc.id === docId
-            ? { ...doc, ...dataToUpdate, reviewedAt: new Date() }
-            : doc
-        )
-      );
-  
-      setExpandedRow(null);
-      setDialogAccion(null);
-      setToastMessage(`Documento ${tipo === 'aprobar' ? 'aprobado' : 'rechazado'} correctamente`);
-      setToastOpen(true);
-    } catch (error) {
-      console.error(`Error al ${tipo} documento:`, error);
-      setToastMessage(`Error al ${tipo} documento`);
-      setToastOpen(true);
-    }
-  };
   
 
   const formatDate = (date) => {
@@ -294,7 +290,7 @@ export default function AdminUploadedDocumentsPage() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">Documentos Subidos</Typography>
+        <Typography variant="h4">Administrador de Documentos</Typography>
         <Button 
           variant="outlined" 
           size="small" 
@@ -369,9 +365,14 @@ export default function AdminUploadedDocumentsPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-          {filteredAndSortedDocuments.map((doc) => (
+            {filteredAndSortedDocuments.map((doc) => (
               <React.Fragment key={doc.id}>
-                <TableRow>
+                <TableRow
+                  key={doc.id}
+                  ref={(el) => {
+                    if (el) documentRefs.current[doc.id] = el;
+                  }}
+                >
                   <TableCell>{doc.companyName}</TableCell>
                   <TableCell>{doc.documentName || 'Sin nombre'}</TableCell>
                   <TableCell>
@@ -423,11 +424,9 @@ export default function AdminUploadedDocumentsPage() {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell style={{ padding: 0 }} colSpan={6}>
-                    
-                    
+                <TableCell style={{ padding: 0 }} colSpan={6}>
                   <Collapse in={expandedRow === doc.id} timeout="auto" unmountOnExit>
-  <Box
+    <Box
     sx={{
       border: '2px solid #000',
       borderRadius: 2,
@@ -476,6 +475,7 @@ export default function AdminUploadedDocumentsPage() {
       Rechazar
     </Button>
   </Box>
+
 )}
 
     {/* Lugar donde irán los botones Aprobar / Rechazar con lógica personalizada */}
@@ -527,10 +527,25 @@ export default function AdminUploadedDocumentsPage() {
             setAdminComments(prev => ({ ...prev, [dialogAccion.doc.id]: val }))
           }
           onConfirm={() => {
-            handleApproveOrReject(dialogAccion.doc.id, dialogAccion.tipo);
-            setDialogAccion(null);
-          }}          
+            if (!dialogAccion?.doc?.id || !dialogAccion?.tipo) return;
+            handleApproveOrReject(
+              dialogAccion.doc.id,
+              dialogAccion.tipo,
+              documents,
+              setDocuments,
+              user,
+              newExpirationDates,
+              adminComments,
+              setToastMessage,
+              setToastOpen,
+              setExpandedRow,
+              setDialogAccion,
+              selectedCompanyId
+            );
+          }}
+          
         />
       </Box>
+
     );
   }

@@ -167,7 +167,7 @@ try {
     // Buscar el nombre de la empresa seleccionada
     const selectedCompany = companies.find(company => company.id === companyId);
     // Usar la función selectCompany del contexto para actualizar tanto el ID como el nombre
-    selectCompany(companyId, selectedCompany ? selectedCompany.name : "");
+    selectCompany(companyId, selectedCompany ? selectedCompany.name : "todas");
   };
 
   // Menú items para la navegación
@@ -177,13 +177,13 @@ try {
     { text: 'Documentos Requeridos', icon: <DescriptionIcon />, path: '/admin/required-documents' },
     // Destacamos la opción de Documentos Subidos para hacerla más visible
     { 
-      text: 'Documentos Subidos', 
+      text: 'Administrar Documentos', 
       icon: <UploadIcon color="secondary" />, 
       path: '/admin/uploaded-documents',
       highlight: true // Marcamos esta opción para destacarla
     },
     { 
-      text: 'Biblioteca de Documentos', 
+      text: 'Biblioteca', 
       icon: <LibraryBooksIcon />, 
       path: '/admin/document-library',
       highlight: true 
@@ -224,7 +224,7 @@ try {
     return company?.name || 'Empresa seleccionada';
   }}
 >
-              <MenuItem value="">
+              <MenuItem value="todas">
                 <em>Todas las empresas</em>
               </MenuItem>
               {companies.map((company) => (

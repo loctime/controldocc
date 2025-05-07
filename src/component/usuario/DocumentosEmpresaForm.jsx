@@ -1,7 +1,12 @@
 // DocumentosEmpresaForm.jsx
 import React, { useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { cleanFirestoreData } from "../../utils/cleanFirestoreData";
+import { useContext } from 'react';
+import { auth } from "../../firebaseconfig";
+
+
+import { AuthContext } from '../../context/AuthContext';
+
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
   DialogActions, DialogContent, DialogTitle, Grid, Paper, TextField, Tooltip, Typography,
@@ -34,142 +39,147 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
 
   const userCompanyData = JSON.parse(localStorage.getItem("userCompany") || '{}');
   const companyId = userCompanyData?.companyId;
+  const { user: currentUser, loading } = useContext(AuthContext);  
 
   useEffect(() => {
-    if (!companyId) return;
-    const fetchDocuments = async () => {
-      const reqQuery = query(collection(db, "requiredDocuments"),
-        where("companyId", "==", companyId),
-        where("entityType", "==", "company"));
-      const upQuery = query(collection(db, "uploadedDocuments"),
-        where("companyId", "==", companyId),
-        where("entityType", "==", "company"));
-      const [reqSnap, upSnap] = await Promise.all([getDocs(reqQuery), getDocs(upQuery)]);
-      setRequiredDocuments(reqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setUploadedDocuments(upSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    };
-    fetchDocuments();
-  }, [companyId, onDocumentUploaded]);
-  const [currentUser, setCurrentUser] = useState(null);
-  useEffect(() => {
-    const auth = getAuth();
-    console.log('[AUTH] Inicializando listener de Firebase');
-  
-    // Verificar usuario actual inmediatamente
-    if (auth.currentUser) {
-      console.log('[AUTH] Usuario encontrado en carga inicial:', auth.currentUser.email);
-      setCurrentUser(auth.currentUser);
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('[AUTH] Cambio de estado de autenticación:', user ? user.email : 'null');
-      setCurrentUser(user);
+    if (loading) return;
+    console.log({
+      currentUser: currentUser ? currentUser.email : null,
+      hasFile: !!fileMap[selectedDocument?.id],
+      uploading,
+      loading,
+      selectedDocument: selectedDocument?.id
     });
+    if (!companyId || loading || !currentUser) return;
 
-    return () => {
-      console.log('[AUTH] Limpiando listener');
-      unsubscribe();
-    };
-  }, []);
-
-  console.log({
-    currentUser: currentUser ? currentUser.email : null,
-    hasFile: !!fileMap[selectedDocument?.id],
-    uploading,
-    selectedDocument: selectedDocument?.id
-  });
-
-  const handleUpload = async () => {
-    if (!selectedDocument || !fileMap?.[selectedDocument?.id]) return;
-    setUploading(true);
-
+  const fetchDocuments = async () => {
     try {
-      if (!currentUser) {
-        alert('Sesión expirada. Por favor, vuelve a iniciar sesión.');
-        return;
-      }
-      
-      const token = await currentUser.getIdToken(true);
-      console.log('[UPLOAD] Token generado:', token?.slice(0, 10) + '...');
-
-      const formData = new FormData();
-      formData.append('file', fileMap?.[selectedDocument?.id]);
-      formData.append('email', currentUser.email);
-      formData.append('folder', 'companyDocuments');
-      
-      // Cambiar a endpoint de conversión
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('[UPLOAD] Error del servidor:', errorData);
-        throw new Error(errorData.error || 'Error en la conversión/subida');
-      }
-
-      const result = await response.json();
-      console.log('[UPLOAD] Conversión y subida exitosa:', {
-        url: result.url,
-        originalType: fileMap?.[selectedDocument?.id].type
-      });
-
-      const existing = uploadedDocuments.find(doc =>
-        doc.requiredDocumentId === selectedDocument?.id && doc.entityId === companyId
+      const reqQuery = query(
+        collection(db, "requiredDocuments"),
+        where("companyId", "==", companyId),
+        where("entityType", "==", "company")
       );
-
-      const rawDocData = {
-        companyId,
-        requiredDocumentId: selectedDocument?.id,
-        documentName: selectedDocument?.name || "Documento",
-        entityType: "company",
-        entityId: companyId,
-        entityName: userCompanyData?.companyName || "Empresa",
-        fileURL: result.url,
-        fileName: fileMap?.[selectedDocument?.id]?.name,
-        fileType: "application/pdf",
-        originalFileType: fileMap?.[selectedDocument?.id]?.type,
-        fileSize: fileMap?.[selectedDocument?.id]?.size,
-        uploadedAt: serverTimestamp(),
-        status: "Pendiente de revisión",
-        comment,
-        expirationDate: selectedDocument.deadline?.date || null,
-      };
-      
-      const docData = cleanFirestoreData(rawDocData);
-      
-
-      if (existing) {
-        await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);
-      } else {
-        await addDoc(collection(db, "uploadedDocuments"), docData);
-      }
-
-      const updatedQuery = query(
+      const upQuery = query(
         collection(db, "uploadedDocuments"),
         where("companyId", "==", companyId),
         where("entityType", "==", "company")
       );
-      const updatedSnapshot = await getDocs(updatedQuery);
-      setUploadedDocuments(updatedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      setDialogOpen(false);
-      setComment("");
-      if (onDocumentUploaded) onDocumentUploaded();
-    } catch (error) {
-      console.error('[UPLOAD] Error completo:', {
-        message: error.message,
-        stack: error.stack
-      });
-      alert(`Error al procesar el documento: ${error.message}`);
-    } finally {
-      setUploading(false);
+      const [reqSnap, upSnap] = await Promise.all([getDocs(reqQuery), getDocs(upQuery)]);
+      setRequiredDocuments(reqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setUploadedDocuments(upSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error("Error al cargar documentos:", err);
     }
   };
+
+  fetchDocuments();
+}, [companyId, currentUser, loading, onDocumentUploaded]);
+
+if (loading) return <CircularProgress />;
+if (!currentUser) return <Alert severity="error">Sesión no iniciada.</Alert>;
+
+const handleUpload = async () => {
+  const file = fileMap?.[selectedDocument?.id];
+  if (!selectedDocument || !file) return;
+  setUploading(true);
+
+  try {
+    if (loading) {
+      alert("Cargando sesión, por favor espera...");
+      return;
+    }
+
+    const firebaseUser = auth.currentUser;
+    if (!currentUser || !firebaseUser) {
+      alert("Sesión expirada. Por favor, vuelve a iniciar sesión.");
+      return;
+    }
+
+    const token = await firebaseUser.getIdToken(true);
+    console.log("[UPLOAD] Token generado:", token?.slice(0, 10) + "...");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("email", firebaseUser.email);
+    formData.append("folder", "companyDocuments");
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("[UPLOAD] Error del servidor:", errorData);
+      throw new Error(errorData.error || "Error en la conversión/subida");
+    }
+
+    const result = await response.json();
+    console.log("[UPLOAD] Conversión y subida exitosa:", {
+      url: result.url,
+      originalType: file.type,
+    });
+
+    const existing = uploadedDocuments.find(
+      (doc) =>
+        doc.requiredDocumentId === selectedDocument?.id &&
+        doc.entityId === companyId
+    );
+
+    const rawDocData = {
+      companyId,
+      requiredDocumentId: selectedDocument?.id,
+      documentName: selectedDocument?.name || "Documento",
+      entityType: "company",
+      entityId: companyId,
+      entityName: userCompanyData?.companyName || "Empresa",
+      fileURL: result.url,
+      fileName: file.name,
+      fileType: "application/pdf",
+      originalFileType: file.type,
+      fileSize: file.size,
+      uploadedAt: serverTimestamp(),
+      status: "Pendiente de revisión",
+      comment,
+      expirationDate: selectedDocument.deadline?.date || null,
+    };
+
+    const docData = cleanFirestoreData(rawDocData);
+
+    if (existing) {
+      await updateDoc(doc(db, "uploadedDocuments", existing.id), docData);
+    } else {
+      await addDoc(collection(db, "uploadedDocuments"), docData);
+    }
+
+    const updatedQuery = query(
+      collection(db, "uploadedDocuments"),
+      where("companyId", "==", companyId),
+      where("entityType", "==", "company")
+    );
+    const updatedSnapshot = await getDocs(updatedQuery);
+    setUploadedDocuments(
+      updatedSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    );
+
+    setDialogOpen(false);
+    setComment("");
+    if (onDocumentUploaded) onDocumentUploaded();
+  } catch (error) {
+    console.error("[UPLOAD] Error completo:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    alert(`Error al procesar el documento: ${error.message}`);
+  } finally {
+    setUploading(false);
+  }
+};
+
   const getDaysToExpire = (doc) => {
     if (!doc.deadline?.date) return null;
     const diff = (new Date(doc.deadline.date) - new Date()) / (1000 * 60 * 60 * 24);
@@ -180,7 +190,9 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
     setPreviewUrl(url);
     setPreviewOpen(true);
   };
-  
+  if (loading) return <CircularProgress />;
+if (!currentUser) return <Alert severity="error">Sesión no iniciada.</Alert>;
+
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>Documentos Requeridos</Typography>

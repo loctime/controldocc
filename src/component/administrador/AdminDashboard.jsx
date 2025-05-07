@@ -1,251 +1,303 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseconfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useCompany } from "../../contextos/company-context";
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Paper, 
-  Card, 
-  CardContent, 
-  CircularProgress,
-  Divider,
-  LinearProgress,
-  Alert,
-  AlertTitle,
-  useTheme
+import { parseFirestoreDate } from "../../utils/dateHelpers";
+import { WarningAmber as WarningAmberIcon } from "@mui/icons-material";
+import { FormControlLabel } from "@mui/material";
+import { Checkbox } from "@mui/material";
+
+import {
+  Box, Typography, Grid, Card, CardContent, Divider, Tooltip,
+  Button, Paper, Chip
 } from "@mui/material";
 import {
-  Description as DescriptionIcon,
-  Upload as UploadIcon,
-  Pending as PendingIcon,
-  CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
+  Pending as PendingIcon,
+  HourglassEmpty as UploadPendingIcon
 } from "@mui/icons-material";
 
 export default function AdminDashboard() {
-  const { selectedCompanyId, selectedCompanyName } = useCompany();
-  const [stats, setStats] = useState({
-    requiredDocuments: 0,
-    uploadedDocuments: 0,
-    pendingDocuments: 0,
-    approvedDocuments: 0,
-    rejectedDocuments: 0,
-    recentlyUploaded: 0, // Documentos cargados en las últimas 24 horas
+  const { selectedCompanyId, companies } = useCompany();
+  const [stats, setStats] = useState({ totalDocumentos: 0, approvalPending: 0, rejected: 0 });
+  const [showDetails, setShowDetails] = useState(null);
+  const [previewDocs, setPreviewDocs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [checkboxFilters, setCheckboxFilters] = useState({
+    vencidos: true,
+    sinFecha: true,
+    conFecha: true
   });
-  const [loading, setLoading] = useState(true);
-  const theme = useTheme();
+  
+  const { selectedCompanyName } = useCompany();
 
   useEffect(() => {
-    const loadStats = async () => {
-      if (!selectedCompanyId) {
-        setLoading(false);
-        return;
-      }
-      
+    const fetchStats = async () => {
       setLoading(true);
       try {
-        const requiredDocsQuery = query(
-          collection(db, "requiredDocuments"),
-          where("companyId", "==", selectedCompanyId)
-        );
-        const uploadedDocsQuery = query(
-          collection(db, "uploadedDocuments"),
-          where("companyId", "==", selectedCompanyId)
-        );
+        const filters = selectedCompanyId ? [where("companyId", "==", selectedCompanyId)] : [];
+        const uploadedSnap = await getDocs(query(collection(db, "uploadedDocuments"), ...filters));
 
-        const [requiredDocsSnapshot, uploadedDocsSnapshot] = await Promise.all([
-          getDocs(requiredDocsQuery),
-          getDocs(uploadedDocsQuery),
-        ]);
-
-        let pending = 0;
-        let approved = 0;
+        let approvalPending = 0;
         let rejected = 0;
-        let recentlyUploaded = 0;
-        
-        // Calcular la fecha de hace 24 horas
-        const oneDayAgo = new Date();
-        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-        const oneDayAgoTimestamp = oneDayAgo.toISOString();
+        let totalConVencimiento = 0;
 
-        uploadedDocsSnapshot.docs.forEach((doc) => {
+        uploadedSnap.forEach(doc => {
           const data = doc.data();
-          if (data.status === "pending") pending++;
-          if (data.status === "approved") approved++;
-          if (data.status === "rejected") rejected++;
-          
-          // Verificar si el documento fue cargado en las últimas 24 horas
-          if (data.uploadedAt && data.uploadedAt > oneDayAgoTimestamp) {
-            recentlyUploaded++;
-          }
+          if (data.expirationDate) totalConVencimiento++;
+          if (data.status === "Pendiente de revisión") approvalPending++;
+          if (data.status === "Rechazado") rejected++;
         });
 
-        setStats({
-          requiredDocuments: requiredDocsSnapshot.size,
-          uploadedDocuments: uploadedDocsSnapshot.size,
-          pendingDocuments: pending,
-          approvedDocuments: approved,
-          rejectedDocuments: rejected,
-          recentlyUploaded: recentlyUploaded,
-        });
-      } catch (error) {
-        console.error("Error loading stats:", error);
+        setStats({ totalDocumentos: totalConVencimiento, approvalPending, rejected });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadStats();
+    fetchStats();
   }, [selectedCompanyId]);
 
-  // Calcular el progreso de documentos subidos vs. requeridos
-  const uploadProgress = stats.requiredDocuments > 0 
-    ? Math.round((stats.uploadedDocuments / stats.requiredDocuments) * 100) 
-    : 0;
+  useEffect(() => {
+    const fetchPreview = async () => {
+      if (!showDetails) return;
+      setPreviewDocs([]);
+      setLoading(true);
 
+      try {
+        let docs = [];
+
+        const baseQuery = collection(db, "uploadedDocuments");
+        const uploadedSnap = showDetails === "TodosDocumentos"
+          ? await getDocs(baseQuery)
+          : await getDocs(query(
+              baseQuery,
+              ...(selectedCompanyId ? [where("companyId", "==", selectedCompanyId)] : []),
+              where("status", "==", showDetails)
+            ));
+
+        const hoy = new Date();
+
+        const docsFiltrados = await Promise.all(uploadedSnap.docs.map(async docSnap => {
+          const data = docSnap.data();
+
+          if (selectedCompanyId && data.companyId !== selectedCompanyId) return null;
+
+          const exp = parseFirestoreDate(data.expirationDate);
+          const diasRestantes = exp ? Math.ceil((exp - hoy) / (1000 * 60 * 60 * 24)) : null;
+
+          let requiredName = "";
+          if (data.requiredDocumentId) {
+            const ref = doc(db, "requiredDocuments", data.requiredDocumentId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) requiredName = snap.data().name;
+          }
+
+          return {
+            id: docSnap.id,
+            name: requiredName || data.fileName || "Sin nombre",
+            expirationDate: exp,
+            diasRestantes,
+            status: data.status || "Sin estado",
+          };
+        }));
+
+        docs = docsFiltrados
+        .filter(Boolean)
+        .sort((a, b) => {
+          // 1. Vencidos primero
+          if (a.diasRestantes !== null && b.diasRestantes !== null) {
+            return a.diasRestantes - b.diasRestantes;
+          }
+      
+          // 2. Si uno no tiene fecha, lo manda al final
+          if (a.diasRestantes === null && b.diasRestantes !== null) return 1;
+          if (a.diasRestantes !== null && b.diasRestantes === null) return -1;
+      
+          // 3. Ambos sin fecha
+          return 0;
+        });
+              setPreviewDocs(docs);
+      } catch (err) {
+        console.error("Error al cargar documentos preview:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPreview();
+  }, [showDetails, selectedCompanyId]);
+
+  const getDeadlineColor = diasRestantes => {
+    if (diasRestantes == null) return 'text.primary';
+    if (diasRestantes < 0) return 'error.main';
+    if (diasRestantes <= 5) return 'error.main';
+    if (diasRestantes <= 10) return 'warning.main';
+    return 'text.primary';
+  };
+
+  const StatCard = ({ title, value, icon, color, filterKey }) => (
+    <Grid item xs={12} sm={4} md={4}>
+      <Card elevation={1} sx={{ height: "100%", p: 1 }}>
+        <CardContent sx={{ p: 1.2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+            <Tooltip title={title} arrow>
+              <Box sx={{ color, display: "flex" }}>{icon}</Box>
+            </Tooltip>
+            <Typography variant="subtitle2" fontWeight={600} fontSize={13}>{title}</Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <Typography variant="h5" align="center" fontWeight="bold">{value}</Typography>
+          <Box mt={1} display="flex" justifyContent="center" gap={1}>
+            <Button size="small" onClick={() => setShowDetails(filterKey)}>Ver todos</Button>
+            {filterKey !== "TodosDocumentos" && (
+              <Button 
+                size="small" 
+                onClick={() => navigate(
+                  `/admin/uploaded-documents?filter=${encodeURIComponent(filterKey)}${selectedCompanyId ? `&empresa=${selectedCompanyId}` : ''}`
+                )}
+              >
+                Ir a resolver
+              </Button>
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+    </Grid>
+  );
+  const visibleDocs = previewDocs.filter(doc => {
+    if (doc.diasRestantes == null) return checkboxFilters.sinFecha;
+    if (doc.diasRestantes < 0) return checkboxFilters.vencidos;
+    return checkboxFilters.conFecha;
+  });
+  
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-        Dashboard del Administrador
-      </Typography>
+      <Typography variant="h5" gutterBottom fontWeight="bold">Dashboard del Administrador</Typography>
 
-      {!selectedCompanyId && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <AlertTitle>Información</AlertTitle>
-          Selecciona una empresa para ver sus estadísticas detalladas
-        </Alert>
-      )}
+      <Grid container spacing={2}>
+        <StatCard
+          title="Proximos a vencer"
+          value={stats.totalDocumentos}
+          icon={<UploadPendingIcon />}
+          color="info.main"
+          filterKey="TodosDocumentos"
+        />
+        <StatCard
+          title="Pendientes de Aprobación"
+          value={stats.approvalPending}
+          icon={<PendingIcon />}
+          color="warning.main"
+          filterKey="Pendiente de revisión"
+        />
+        <StatCard
+          title="Rechazados"
+          value={stats.rejected}
+          icon={<CancelIcon />}
+          color="error.main"
+          filterKey="Rechazado"
+        />
+      </Grid>
 
-      {selectedCompanyId && stats.recentlyUploaded > 0 && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <AlertTitle>Nuevos documentos cargados</AlertTitle>
-          <strong>{stats.recentlyUploaded} documento{stats.recentlyUploaded !== 1 ? 's' : ''}</strong> ha{stats.recentlyUploaded !== 1 ? 'n' : ''} sido cargado{stats.recentlyUploaded !== 1 ? 's' : ''} en las últimas 24 horas.
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" component="span">
-              Revísalos en la sección de <strong>Documentos Subidos</strong>.
-            </Typography>
-          </Box>
-        </Alert>
-      )}
+      {showDetails && (
+        <Box mt={4}>
+          <Typography variant="h6" mb={2}>
+            {selectedCompanyId
+              ? `${selectedCompanyName} - Documentos...`
+              : "Todos los documentos - ..."}
+          </Typography>
 
-      {selectedCompanyId && stats.pendingDocuments > 0 && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          <AlertTitle>Documentos pendientes de verificación</AlertTitle>
-          Hay <strong>{stats.pendingDocuments} documento{stats.pendingDocuments !== 1 ? 's' : ''}</strong> pendiente{stats.pendingDocuments !== 1 ? 's' : ''} de verificación para esta empresa.
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" component="span">
-              Por favor, revísalos en la sección de <strong>Documentos Subidos</strong> para aprobarlos o rechazarlos.
-            </Typography>
-          </Box>
-        </Alert>
-      )}
+          {loading ? (
+            <Typography>Cargando...</Typography>
+          ) : previewDocs.length === 0 ? (
+            <Typography>No hay documentos para mostrar.</Typography>
+          ) : (
+            <Box sx={{ maxWidth: 600 }}>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+  <FormControlLabel
+    control={
+      <Checkbox
+        checked={checkboxFilters.vencidos}
+        onChange={(e) =>
+          setCheckboxFilters(prev => ({ ...prev, vencidos: e.target.checked }))
+        }
+      />
+    }
+    label="Vencidos"
+  />
+  <FormControlLabel
+    control={
+      <Checkbox
+        checked={checkboxFilters.conFecha}
+        onChange={(e) =>
+          setCheckboxFilters(prev => ({ ...prev, conFecha: e.target.checked }))
+        }
+      />
+    }
+    label="Con fecha"
+  />
+  <FormControlLabel
+    control={
+      <Checkbox
+        checked={checkboxFilters.sinFecha}
+        onChange={(e) =>
+          setCheckboxFilters(prev => ({ ...prev, sinFecha: e.target.checked }))
+        }
+      />
+    }
+    label="Sin fecha"
+  />
+</Box>
 
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
-          <CircularProgress />
+              <Paper variant="outlined">
+                <Box sx={{ display: 'flex', fontWeight: 'bold', p: 1, bgcolor: '#f5f5f5' }}>
+                  <Box sx={{ flex: 2 }}>Documento</Box>
+                  <Box sx={{ flex: 1 }}>Vencimiento</Box>
+                </Box>
+                {visibleDocs.map(doc => (
+  <Box key={doc.id} sx={{ display: 'flex', p: 1, borderTop: '1px solid #eee' }}>
+    <Box sx={{ flex: 2 }}>{doc.name}</Box>
+    <Box sx={{ flex: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ color: getDeadlineColor(doc.diasRestantes) }}>
+          {doc.expirationDate instanceof Date && !isNaN(doc.expirationDate)
+            ? doc.expirationDate.toLocaleDateString()
+            : 'Sin fecha'}
+        </Typography>
+        {doc.diasRestantes < 0 && (
+          <Tooltip title="Documento vencido">
+            <WarningAmberIcon color="error" fontSize="small" />
+          </Tooltip>
+        )}
+      </Box>
+      <Chip
+        label={doc.status}
+        color={
+          doc.status === 'Aprobado' ? 'success' :
+          doc.status === 'Rechazado' ? 'error' :
+          'warning'
+        }
+        size="small"
+        clickable
+        onClick={() =>
+          navigate(`/admin/uploaded-documents?empresa=${doc.companyId}&docId=${doc.id}`)
+        }
+      />
+    </Box>
+  </Box>
+))}
+
+
+
+              </Paper>
+            </Box>
+          )}
         </Box>
-      ) : (
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <StatCard 
-              title="Documentos Requeridos" 
-              value={stats.requiredDocuments} 
-              icon={<DescriptionIcon />}
-              color={theme.palette.primary.main}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <StatCard 
-              title="Documentos Subidos" 
-              value={stats.uploadedDocuments} 
-              icon={<UploadIcon />}
-              color={theme.palette.success.main}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <StatCard 
-              title="Pendientes de Aprobación" 
-              value={stats.pendingDocuments} 
-              icon={<PendingIcon />}
-              color={theme.palette.warning.main}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <StatCard 
-              title="Documentos Aprobados" 
-              value={stats.approvedDocuments} 
-              icon={<CheckCircleIcon />}
-              color={theme.palette.success.dark}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <StatCard 
-              title="Documentos Rechazados" 
-              value={stats.rejectedDocuments} 
-              icon={<CancelIcon />}
-              color={theme.palette.error.main}
-            />
-          </Grid>
-          
-          {/* Progreso general */}
-          <Grid item xs={12}>
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Progreso General
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 2, mb: 1 }}>
-                <Box sx={{ width: '100%', mr: 1 }}>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={uploadProgress} 
-                    sx={{ height: 10, borderRadius: 5 }}
-                  />
-                </Box>
-                <Box sx={{ minWidth: 35 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {`${uploadProgress}%`}
-                  </Typography>
-                </Box>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                {stats.uploadedDocuments} de {stats.requiredDocuments} documentos completados
-              </Typography>
-            </Paper>
-          </Grid>
-        </Grid>
       )}
     </Box>
   );
 }
-
-function StatCard({ title, value, icon, color }) {
-  return (
-    <Card elevation={2} sx={{ borderRadius: 2, height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ 
-            backgroundColor: `${color}20`, // Color con 20% de opacidad
-            borderRadius: '50%',
-            p: 1,
-            mr: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            {React.cloneElement(icon, { sx: { color }, key: `icon-${title}` })}
-          </Box>
-          <Typography variant="h6" component="div">
-            {title}
-          </Typography>
-        </Box>
-        <Divider sx={{ my: 1.5 }} />
-        <Typography variant="h3" component="div" fontWeight="bold" align="center" sx={{ mt: 2 }}>
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-}
-//

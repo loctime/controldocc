@@ -12,6 +12,7 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { auth, db } from "../../firebaseconfig";
 import { signInWithCustomToken } from "firebase/auth";
 
+
 const ADMIN_ROLE = "DhHkVja"; // Rol de administrador
 
 const Login = () => {
@@ -33,8 +34,11 @@ const Login = () => {
 
   const handleAdminLogin = async () => {
     if (!email.trim() || !password) {
+      
       setError('Por favor completa todos los campos');
+
       return;
+
     }
 
     setLoading(true);
@@ -95,15 +99,13 @@ const Login = () => {
   
       // 🔐 Autenticar con Firebase usando el token personalizado
       await signInWithCustomToken(auth, token);
-  
-      // Guardar información adicional si querés (opcional)
       localStorage.setItem("userCompany", JSON.stringify({
-        companyId: cuit.trim()
+        companyId: cuit.trim(),
       }));
-  
+      localStorage.setItem("firebaseUid", auth.currentUser?.uid); // 🔒 útil para debug o tracking
+
       navigate("/usuario/dashboard");
       setTimeout(() => window.location.reload(), 100);
-  
     } catch (err) {
       console.error("Error login usuario empresa:", err);
       setError(err.message || "Error al iniciar sesión");

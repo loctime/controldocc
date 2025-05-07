@@ -40,7 +40,7 @@ function AdminTabs() {
 
   const tabConfig = [
     { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
-    { icon: <DescriptionIcon />, label: 'Documentos Subidos', content: <AdminUploadedDocumentsPage /> },
+    { icon: <DescriptionIcon />, label: 'Administrar Documentos', content: <AdminUploadedDocumentsPage /> },
     { icon: <AssignmentTurnedInIcon />, label: 'Documentos Requeridos', content: <AdminRequiredDocumentsPage /> },
     { icon: <FolderIcon />, label: 'Biblioteca de Documentos', content: <DocumentLibraryPage /> }
   ];

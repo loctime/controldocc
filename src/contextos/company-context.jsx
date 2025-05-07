@@ -15,17 +15,17 @@ export function useCompany() {
 
 // ✅ Proveedor que encapsula los valores compartidos
 export function CompanyProvider({ children }) {
-  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
-  const [selectedCompanyName, setSelectedCompanyName] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [selectedCompanyName, setSelectedCompanyName] = useState('');
 
-  const selectCompany = (id, name) => {
+  const selectCompany = (id = '', name = '') => {
     setSelectedCompanyId(id);
-    setSelectedCompanyName(name || "");
+    setSelectedCompanyName(name);
   };
-
+  
   const clearSelectedCompany = () => {
-    setSelectedCompanyId(null);
-    setSelectedCompanyName("");
+    setSelectedCompanyId('');
+    setSelectedCompanyName('');
   };
 
   return (

@@ -46,9 +46,7 @@ export default function DocumentosPanel({
         borderRadius: '12px',
         backgroundColor: 'background.paper'
       }}>
-        <Typography variant="h6" gutterBottom>
-          Documentos Requeridos
-        </Typography>
+        
 
         {requiredDocuments.length === 0 ? (
           <Typography color="textSecondary">

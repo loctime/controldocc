@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { db } from "../../firebaseconfig";
+import { auth } from "../../firebaseconfig";
+
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import useDashboardData from "./components/hooks/useDashboardData";
 import {
@@ -32,7 +34,7 @@ import {
   TableCell,
   Tooltip
 } from "@mui/material";
-import { auth, firebaseSignOut } from "../../firebaseconfig";
+import { firebaseSignOut } from "../../firebaseconfig";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PersonIcon from "@mui/icons-material/Person";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
@@ -55,7 +57,7 @@ import { getDeadlineColor } from '../../utils/getDeadlineColor';
 const UsuarioDashboard = () => {
   const userCompanyData = JSON.parse(localStorage.getItem('userCompany'));
   const companyId = userCompanyData?.companyId;
-  
+  const { user: currentUser } = useContext(AuthContext);  
   const {
     company,
     requiredDocuments,

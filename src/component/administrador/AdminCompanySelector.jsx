@@ -21,7 +21,7 @@ const AdminCompanySelector = () => {
   const handleCompanyChange = (event) => {
     const companyId = event.target.value;
     if (!companyId) {
-      selectCompany(null, '');
+      selectCompany('todas', 'todas');
       return;
     }
 
@@ -54,12 +54,12 @@ const AdminCompanySelector = () => {
           <Select
             labelId="company-select-label"
             id="company-select"
-            value={selectedCompanyId || ''}
+            value={selectedCompanyId || 'todas'}
             label="Empresa"
             onChange={handleCompanyChange}
           >
-            <MenuItem value="">
-              <em>Seleccione una empresa</em>
+            <MenuItem value="todas">
+              <em>Todas las empresas</em>
             </MenuItem>
             {companies.map((company) => (
               <MenuItem key={company.id} value={company.id}>

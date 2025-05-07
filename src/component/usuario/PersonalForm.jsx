@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { db } from "../../firebaseconfig";
+
+
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Box,
@@ -13,6 +15,7 @@ import {
   CircularProgress
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import { AuthContext } from "../../context/AuthContext";
 
 const PersonalForm = () => {
   const [nombre, setNombre] = useState("");
@@ -24,6 +27,8 @@ const PersonalForm = () => {
 
   const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
   const companyId = userCompanyData?.companyId;
+
+  const { user: currentUser } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,14 +65,16 @@ const PersonalForm = () => {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim(),
-        companyId,
+        companyId: currentUser.companyId,
         createdAt: serverTimestamp(),
+        createdBy: currentUser?.uid || null,
       };
       
-     const docData = Object.fromEntries(
-  Object.entries(rawDocData).filter(([_, v]) => v !== undefined)
-);
-await addDoc(collection(db, "uploadedDocuments"), docData);
+      const docData = Object.fromEntries(
+        Object.entries(rawData).filter(([_, v]) => v !== undefined)
+      );
+      
+await addDoc(collection(db, "personal"), docData);
 
       
 
