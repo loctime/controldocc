@@ -4,7 +4,7 @@ import {
   Select, MenuItem, Button, Typography, OutlinedInput
 } from '@mui/material';
 import { Search, Clear } from '@mui/icons-material';
-import { useCompany } from '../../../contextos/company-context';
+import { useCompanies } from '../../../context/CompaniesContext';
 
 export default function DocumentFilters({
   filters,

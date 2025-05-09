@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /companies/{companyId} {
+      // Permitir crear empresas sin autenticación
+      allow create: if true;
+      // Solo el admin puede leer, actualizar o borrar
+      allow read, update, delete: if isAdmin();
+    }
+match /uploadedDocuments/{document=**} {
+  allow read, write: if isAdmin();
+}
+    match /users/{userId} {
+      // Solo el admin puede crear, leer, modificar o borrar usuarios
+      allow read, write: if isAdmin();
+    }
+
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "DhHkVja";
+    }
+  }
+}

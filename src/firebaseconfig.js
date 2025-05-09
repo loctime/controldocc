@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, browserLocalPersistence } from "firebase/auth";
 
 // Your web app's Firebase configuration using environment variables
@@ -16,9 +16,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-auth.setPersistence(browserLocalPersistence); // <-- Agregar esto
-// Constante para el rol de administrador
+auth.setPersistence(browserLocalPersistence);
+
+// Constantes para roles y estados
 const ADMIN_ROLE = "DhHkVja";
+const COMPANY_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected'
+};
 
 /**
  * Verifica si un usuario es administrador basado en su rol
@@ -27,50 +33,76 @@ const ADMIN_ROLE = "DhHkVja";
  */
 async function isUserAdmin(userId) {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      return userData.rol === ADMIN_ROLE;
+    const companyDoc = await getDoc(doc(db, "companies", userId));
+    if (companyDoc.exists()) {
+      return companyDoc.data().role === ADMIN_ROLE;
     }
     return false;
   } catch (error) {
-    console.error("Error al verificar el rol del usuario:", error);
+    console.error("Error al verificar rol de administrador:", error);
     return false;
   }
 }
 
 /**
- * Inicia sesión con email y contraseña y verifica si es administrador
- * @param {Object} credentials - Credenciales del usuario (email y password)
- * @returns {Promise<Object>} - Objeto con información del usuario y si es admin
+ * Verifica si una empresa está aprobada
+ * @param {string} companyId - ID de la empresa
+ * @returns {Promise<boolean>} - True si la empresa está aprobada
+ */
+async function isCompanyApproved(companyId) {
+  const docSnap = await getDoc(doc(db, "companies", companyId));
+  return docSnap.exists() && docSnap.data().status === COMPANY_STATUS.APPROVED;
+}
+
+/**
+ * Obtiene empresas pendientes de aprobación
+ * @returns {Promise<Array>} - Lista de empresas pendientes
+ */
+async function getPendingCompanies() {
+  const q = query(
+    collection(db, "companies"),
+    where("status", "==", COMPANY_STATUS.PENDING)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Actualiza el estado de una empresa
+ * @param {string} companyId - ID de la empresa
+ * @param {string} status - Nuevo estado (COMPANY_STATUS)
+ * @returns {Promise<void>}
+ */
+async function updateCompanyStatus(companyId, status) {
+  await updateDoc(doc(db, "companies", companyId), { 
+    status,
+    reviewedAt: new Date() 
+  });
+}
+
+/**
+ * Inicia sesión con email y contraseña y verifica permisos
+ * @param {Object} credentials - Credenciales del usuario
+ * @returns {Promise<Object>} - Objeto con información del usuario
  */
 async function signIn(credentials) {
   try {
-    const { email, password } = credentials;
-    console.log('Intentando iniciar sesión con:', email);
-    
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
     const user = userCredential.user;
-    console.log('Usuario autenticado:', user.uid);
     
-    // Intentar verificar si es administrador, pero no fallar si hay problemas
-    let isAdmin = false;
-    try {
-      isAdmin = await isUserAdmin(user.uid);
-      console.log('Es administrador:', isAdmin);
-    } catch (adminError) {
-      console.error('Error al verificar rol de administrador:', adminError);
-      // Si hay error al verificar el rol, asumimos que no es admin pero permitimos continuar
-      isAdmin = false;
+    const [isAdmin, isApproved] = await Promise.all([
+      isUserAdmin(user.uid),
+      isCompanyApproved(user.uid)
+    ]);
+
+    if (!isAdmin && !isApproved) {
+      throw new Error("Su empresa aún no ha sido aprobada por el administrador");
     }
-    
-    return {
-      user,
-      isAdmin
-    };
+
+    return { user, isAdmin };
   } catch (error) {
-    console.error('Error en función signIn:', error);
-    throw error; // Re-lanzamos el error para que pueda ser manejado por el componente
+    console.error('Error en signIn:', error);
+    throw error;
   }
 }
 
@@ -107,4 +139,16 @@ async function loginWithGoogle() {
   }
 }
 
-export { db, auth, ADMIN_ROLE, isUserAdmin, signIn, loginWithGoogle, firebaseSignOut };
+export { 
+  db, 
+  auth, 
+  ADMIN_ROLE, 
+  COMPANY_STATUS,
+  isUserAdmin, 
+  isCompanyApproved,
+  getPendingCompanies,
+  updateCompanyStatus,
+  signIn, 
+  loginWithGoogle, 
+  firebaseSignOut 
+};

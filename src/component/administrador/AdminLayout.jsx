@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useCompany } from "../../contextos/company-context";
+import { useCompanies } from "../../context/CompaniesContext";
 import { db, auth } from "../../firebaseconfig";
 import { collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { styled, useTheme } from "@mui/material/styles";
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import ApprovalIcon from '@mui/icons-material/Approval';
 
 import {
   Box,
@@ -103,7 +104,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const [companies, setCompanies] = useState([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const { selectedCompanyId, selectCompany } = useCompany();
+  const { selectedCompanyId, selectCompany } = useCompanies();
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -187,6 +188,11 @@ try {
       icon: <LibraryBooksIcon />, 
       path: '/admin/document-library',
       highlight: true 
+    },
+    {
+      text: 'Aprobar Empresas',
+      icon: <ApprovalIcon />,
+      path: '/admin/company-approvals'
     }
    
   ];

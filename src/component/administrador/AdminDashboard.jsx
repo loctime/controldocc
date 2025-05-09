@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
-import { useCompany } from "../../contextos/company-context";
+import { useCompanies } from "../../context/CompaniesContext";
 import { parseFirestoreDate } from "../../utils/dateHelpers";
 import { WarningAmber as WarningAmberIcon } from "@mui/icons-material";
 import { FormControlLabel } from "@mui/material";
@@ -19,7 +19,7 @@ import {
 } from "@mui/icons-material";
 
 export default function AdminDashboard() {
-  const { selectedCompanyId, companies } = useCompany();
+  const { selectedCompanyId, companies } = useCompanies();
   const [stats, setStats] = useState({ totalDocumentos: 0, approvalPending: 0, rejected: 0 });
   const [showDetails, setShowDetails] = useState(null);
   const [previewDocs, setPreviewDocs] = useState([]);
@@ -31,7 +31,7 @@ export default function AdminDashboard() {
     conFecha: true
   });
   
-  const { selectedCompanyName } = useCompany();
+  const selectedCompanyName = companies.find(c => c.id === selectedCompanyId)?.name || "Todas las empresas";
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -290,9 +290,6 @@ export default function AdminDashboard() {
     </Box>
   </Box>
 ))}
-
-
-
               </Paper>
             </Box>
           )}

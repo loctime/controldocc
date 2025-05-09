@@ -20,7 +20,7 @@ import {
 } from '@mui/icons-material';
 import { db, auth } from '../../firebaseconfig';
 import { collection, getDocs, query, where, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { useCompany } from '../../contextos/company-context';
+import { useCompanies } from '../../context/CompaniesContext';
 import AdminCompanySelector from './AdminCompanySelector';
 import { AuthContext } from '../../context/AuthContext';
 import VistaDocumentoSubido from './VistaDocumentoSubido';

@@ -1,6 +1,6 @@
 // src/component/administrador/AdminPage.jsx
 import React, { useState } from 'react';
-import { CompanyProvider, useCompany } from '../../contextos/company-context'; // ✅ reemplazo correcto
+import { CompaniesProvider, useCompanyList } from '../../context/CompaniesContext'; // ✅ reemplazo correcto
 import AdminCompanySelector from './AdminCompanySelector';
 import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
@@ -36,7 +36,7 @@ function AdminTabs() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = parseInt(searchParams.get('tab')) || 0;
   const [tabValue, setTabValue] = useState(initialTab);
-  const { selectedCompanyName, selectedCompanyId } = useCompany(); // ✅ correcto uso
+  const { selectedCompanyName, selectedCompanyId } = useCompanyList(); // ✅ correcto uso
 
   const tabConfig = [
     { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
@@ -80,7 +80,7 @@ function AdminTabs() {
 
 export default function AdminPage() {
   return (
-    <CompanyProvider>
+    <CompaniesProvider>
       <Box sx={{ p: 3 }}>
         <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
           <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -95,6 +95,6 @@ export default function AdminPage() {
         <AdminCompanySelector />
         <AdminTabs />
       </Box>
-    </CompanyProvider>
+    </CompaniesProvider>
   );
 }

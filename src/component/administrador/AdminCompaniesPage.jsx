@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Grid, CircularProgress, Box } from "@mui/material";  // Para el loading y la visualización de la lista de empresas
-import { useCompanyList } from "../../contextos/company-list-context";  // Hook para obtener la lista de empresas
+import { useCompanyList } from "../../context/CompaniesContext";  // Hook para obtener la lista de empresas
 import CreateCompany from "./dialogs/CreateCompany";  // Importa tu nuevo componente para crear empresas
 import { Card, CardContent, CardActions, Divider, IconButton, Tooltip } from "@mui/material"; // Para mostrar las tarjetas de empresa
 import { Delete as DeleteIcon, Edit as EditIcon, Business as BusinessIcon } from "@mui/icons-material";  // Íconos

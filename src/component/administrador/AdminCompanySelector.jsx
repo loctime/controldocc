@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCompanyList } from '../../contextos/company-list-context';
+import { useCompanies } from '../../context/CompaniesContext';
 import {
   Box,
   FormControl,
@@ -12,10 +12,9 @@ import {
   Alert
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
-import { useCompany } from '../../contextos/company-context';
 
 const AdminCompanySelector = () => {
-  const { companies, loading, error } = useCompanyList();
+  const { companies, loading, error } = useCompanies();
   const { selectedCompanyId, selectCompany } = useCompany();
 
   const handleCompanyChange = (event) => {
