@@ -1,62 +1,18 @@
 // src/router/AppRouter.jsx
-import React, { useContext, useState, useEffect } from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
 import { CompaniesProvider } from "../context/CompaniesContext";
-import { Box, Typography, CircularProgress } from "@mui/material";
-import DocumentLibraryPage from "../component/administrador/DocumentLibraryPage";
-// Componentes
+import ProtectedRoute from "./ProtectedRoute"; // ✅ import del nuevo componente
 import Login from "../component/public/Login";
+import Register from "../component/public/register";
 import AdminLayout from "../component/administrador/AdminLayout";
 import AdminDashboard from "../component/administrador/AdminDashboard";
 import AdminCompaniesPage from "../component/administrador/AdminCompaniesPage";
 import AdminRequiredDocumentsPage from "../component/administrador/AdminRequiredDocumentsPage";
 import AdminUploadedDocumentsPage from "../component/administrador/AdminUploadedDocumentsPage";
-import UsuarioDashboard from "../component/usuario/UsuarioDashboard";
-// Nuevos componentes
-import Register from "../component/public/register";
+import DocumentLibraryPage from "../component/administrador/DocumentLibraryPage";
 import AdminAcceptCompanyPage from "../component/administrador/AdminAcceptCompanyPage";
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebaseconfig';
-
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useContext(AuthContext);
-  const [verifyingRole, setVerifyingRole] = useState(true);
-
-  useEffect(() => {
-    const verifyRole = async () => {
-      if (user) {
-        console.log('[ProtectedRoute] Verificando rol para:', user.uid);
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        
-        if (userDoc.exists()) {
-          console.log('[ProtectedRoute] Datos de usuario:', userDoc.data());
-          const role = userDoc.data().role === "DhHkVja" ? "admin" : "user";
-          console.log(`[ProtectedRoute] Rol requerido: ${allowedRoles}, Rol actual: ${role}`);
-          
-          if (!allowedRoles.includes(role)) {
-            console.log('[ProtectedRoute] Redirigiendo por rol no autorizado');
-            return <Navigate to={`/${role}/dashboard`} replace />;
-          }
-        }
-      }
-      setVerifyingRole(false);
-    };
-    verifyRole();
-  }, [user]);
-
-  if (loading || verifyingRole) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-
-  return children;
-};
+import UsuarioDashboard from "../component/usuario/UsuarioDashboard";
 
 const AppRouter = () => {
   return (
@@ -65,9 +21,11 @@ const AppRouter = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
 
+          {/* Rutas públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
+          {/* Rutas protegidas para administradores */}
           <Route
             path="/admin"
             element={
@@ -85,6 +43,7 @@ const AppRouter = () => {
             <Route path="document-library" element={<DocumentLibraryPage />} />
           </Route>
 
+          {/* Rutas protegidas para usuarios */}
           <Route
             path="/usuario"
             element={
@@ -102,6 +61,7 @@ const AppRouter = () => {
             }
           />
 
+          {/* Ruta fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </CompaniesProvider>

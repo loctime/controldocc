@@ -5,6 +5,10 @@ import {
   TableContainer, Table, TableHead, TableBody, TableRow, TableCell,
   Tooltip, Box
 } from '@mui/material';
+import EditDeleteActions from '../../../../components/EditDeleteActions';
+import Swal from 'sweetalert2';
+import { db } from '../../../../firebaseconfig';
+import { doc, deleteDoc } from 'firebase/firestore';
 import VehiculosForm from '../../../usuario/VehiculosForm';
 import DocumentosVehiculoForm from '../../../usuario/DocumentosVehiculoForm';
 import EntidadPanel from '../../EntidadPanel';
@@ -37,14 +41,56 @@ console.log(requiredDocuments);
     refreshUploadedDocuments && refreshUploadedDocuments(); // Refresca documentos si corresponde
   };
 
-  return (
+  const [editVehiculo, setEditVehiculo] = useState(null);
+const [openEditDialog, setOpenEditDialog] = useState(false);
+const [localVehiculos, setLocalVehiculos] = useState(vehiculos);
+
+useEffect(() => {
+  setLocalVehiculos(vehiculos);
+}, [vehiculos]);
+
+return (
     <>
       <VehiculosForm key={formKey} companyId={undefined} onVehiculoAdded={handleVehiculoAdded} />
-      
+      {/* Modal de edición de vehículo */}
+      <Dialog
+        open={openEditDialog && !!editVehiculo}
+        onClose={() => {
+          setOpenEditDialog(false);
+          setEditVehiculo(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Editar vehículo</DialogTitle>
+        <DialogContent dividers>
+          {editVehiculo && (
+            <VehiculosForm
+              modoEdicion
+              vehiculo={editVehiculo}
+              onVehiculoEdited={async (updatedData) => {
+                setOpenEditDialog(false);
+                setEditVehiculo(null);
+                setLocalVehiculos(prev => prev.map(v => v.id === updatedData.id ? {...v, ...updatedData} : v));
+                if (typeof refreshUploadedDocuments === 'function') refreshUploadedDocuments();
+              }}
+              companyId={editVehiculo?.companyId}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setOpenEditDialog(false);
+            setEditVehiculo(null);
+          }}>
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
       <EntidadPanel
-  title={`Vehículos Registrados (${vehiculos.length})`}
+  title={`Vehículos Registrados (${localVehiculos.length})`}
   entityType="vehicle"
-  entityList={vehiculos}
+  entityList={localVehiculos}
   documentosRequeridos={requiredDocuments}
   documentosSubidos={uploadedDocuments}
   getDeadlineColor={getDeadlineColor}
@@ -58,11 +104,40 @@ console.log(requiredDocuments);
       <>
         <TableCell><b>Patente</b></TableCell>
         <TableCell><b>Modelo</b></TableCell>
+        <TableCell><b>Acciones</b></TableCell>
       </>
     ) : (
       <>
         <TableCell>{v.patente}</TableCell>
         <TableCell>{v.modelo}</TableCell>
+        <TableCell>
+          <EditDeleteActions
+            onEdit={() => {
+              setEditVehiculo(v);
+              setOpenEditDialog(true);
+            }}
+            onDelete={async () => {
+              const confirm = await Swal.fire({
+                title: '¿Estás seguro?',
+                text: `¿Deseas eliminar el vehículo ${v.patente}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+              });
+              if (confirm.isConfirmed) {
+                try {
+                  await deleteDoc(doc(db, 'vehiculos', v.id));
+                  Swal.fire('Eliminado', 'El vehículo ha sido eliminado.', 'success');
+                  setLocalVehiculos(prev => prev.filter(item => item.id !== v.id));
+                  if (typeof refreshUploadedDocuments === 'function') refreshUploadedDocuments();
+                } catch (error) {
+                  Swal.fire('Error', 'No se pudo eliminar el vehículo.', 'error');
+                }
+              }
+            }}
+          />
+        </TableCell>
       </>
     )
   }

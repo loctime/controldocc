@@ -8,6 +8,9 @@ import {
   TableContainer, Table, TableHead, TableBody, TableRow, TableCell,
   Tooltip, Box
 } from '@mui/material';
+import EditDeleteActions from '../../../../components/EditDeleteActions';
+import Swal from 'sweetalert2';
+import { doc, deleteDoc } from 'firebase/firestore';
 import PersonIcon from '@mui/icons-material/Person';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PersonalForm from '../../PersonalForm';
@@ -27,6 +30,12 @@ export default function PersonalPanel({
   getDeadlineColor,
   companyId
 }) {
+  const [localPersonal, setLocalPersonal] = useState(personal);
+
+  // Sincroniza cuando cambie la prop
+  useEffect(() => {
+    setLocalPersonal(personal);
+  }, [personal]);
   const [formKey, setFormKey] = useState(0);
 
 
@@ -40,11 +49,22 @@ export default function PersonalPanel({
     refreshUploadedDocuments && refreshUploadedDocuments();
   };
 
+  const handleEditPersona = async (persona) => {
+    try {
+      await updateDoc(doc(db, 'personal', persona.id), persona);
+      Swal.fire('Actualizado', 'La persona ha sido actualizada.', 'success');
+      if (typeof refreshUploadedDocuments === 'function') refreshUploadedDocuments();
+    } catch (error) {
+      Swal.fire('Error', 'No se pudo actualizar la persona.', 'error');
+    }
+  };
 
   const [showImportPersonal, setShowImportPersonal] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [openDocumentosDialog, setOpenDocumentosDialog] = useState(false);
+  const [editPersona, setEditPersona] = useState(null);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
   const { user: currentUser } = useContext(AuthContext);
 
 
@@ -96,11 +116,12 @@ export default function PersonalPanel({
                     .map((doc) => (
                       <TableCell key={doc.id}><b>{doc.name}</b></TableCell>
                     ))}
-                  <TableCell><b>Ver Más</b></TableCell>
+                  <TableCell><b>Acciones</b></TableCell>
+<TableCell><b>Ver Más</b></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {personal.map((persona) => (
+                {localPersonal.map((persona) => (
                   <TableRow
                     key={persona.id}
                     sx={{
@@ -112,6 +133,35 @@ export default function PersonalPanel({
                   >
                     <TableCell>{persona.nombre} {persona.apellido}</TableCell>
                     <TableCell>{persona.dni}</TableCell>
+                    <TableCell>
+                      <EditDeleteActions
+                        onEdit={() => {
+                          setEditPersona(persona);
+                          setOpenEditDialog(true);
+                        }}
+                        onDelete={async () => {
+                          const confirm = await Swal.fire({
+                            title: '¿Estás seguro?',
+                            text: `¿Deseas eliminar a ${persona.nombre} ${persona.apellido}?`,
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sí, eliminar',
+                            cancelButtonText: 'Cancelar',
+                          });
+                          if (confirm.isConfirmed) {
+                            try {
+                              await deleteDoc(doc(db, 'personal', persona.id));
+                              Swal.fire('Eliminado', 'La persona ha sido eliminada.', 'success');
+                              setLocalPersonal(prev => prev.filter(p => p.id !== persona.id));
+                              // Si quieres, puedes seguir refrescando la lista global:
+                              if (typeof refreshUploadedDocuments === 'function') refreshUploadedDocuments();
+                            } catch (error) {
+                              Swal.fire('Error', 'No se pudo eliminar la persona.', 'error');
+                            }
+                          }
+                        }}
+                      />
+                    </TableCell>
 
                     {[...(requiredDocuments || [])]
                       .filter(doc => doc.entityType === "employee")
@@ -212,6 +262,43 @@ export default function PersonalPanel({
         <DialogActions>
           <Button onClick={() => setOpenDocumentosDialog(false)}>
             Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de edición de persona */}
+      <Dialog
+        open={openEditDialog && !!editPersona}
+        onClose={() => {
+          setOpenEditDialog(false);
+          setEditPersona(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Editar persona</DialogTitle>
+        <DialogContent dividers>
+          {editPersona && (
+            <PersonalForm
+              modoEdicion
+              persona={editPersona}
+              onPersonalEdited={async (updatedData) => {
+                setOpenEditDialog(false);
+                setEditPersona(null);
+                // Actualiza el estado local de la persona editada
+                setLocalPersonal(prev => prev.map(p => p.id === updatedData.id ? {...p, ...updatedData} : p));
+                if (typeof refreshUploadedDocuments === 'function') refreshUploadedDocuments();
+              }}
+              companyId={companyId}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setOpenEditDialog(false);
+            setEditPersona(null);
+          }}>
+            Cancelar
           </Button>
         </DialogActions>
       </Dialog>

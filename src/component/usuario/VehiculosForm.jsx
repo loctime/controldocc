@@ -15,14 +15,26 @@ import {
 } from "@mui/material";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 
-const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId }) => {
-  const [marca, setMarca] = useState("");
-  const [modelo, setModelo] = useState("");
-  const [patente, setPatente] = useState("");
-  const [año, setAño] = useState("");
+import { doc, updateDoc } from "firebase/firestore";
+
+const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId, modoEdicion = false, vehiculo = null, onVehiculoEdited }) => {
+  const [marca, setMarca] = useState(vehiculo ? vehiculo.marca : "");
+  const [modelo, setModelo] = useState(vehiculo ? vehiculo.modelo : "");
+  const [patente, setPatente] = useState(vehiculo ? vehiculo.patente : "");
+  const [año, setAño] = useState(vehiculo ? vehiculo.año : "");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  // Actualiza los campos si cambia el vehículo a editar
+  React.useEffect(() => {
+    if (modoEdicion && vehiculo) {
+      setMarca(vehiculo.marca || "");
+      setModelo(vehiculo.modelo || "");
+      setPatente(vehiculo.patente || "");
+      setAño(vehiculo.año || "");
+    }
+  }, [modoEdicion, vehiculo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,44 +56,64 @@ const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId }) => {
     setError("");
 
     try {
-      // 🔥 Verificar si ya existe la patente
-      const patenteQuery = query(
-        collection(db, "vehiculos"),
-        where("patente", "==", patente.trim()),
-        where("companyId", "==", companyId)
-      );
-      const existingPatenteSnap = await getDocs(patenteQuery);
+      if (modoEdicion && vehiculo && vehiculo.id) {
+        // Modo edición: actualizar vehículo existente
+        await updateDoc(doc(db, "vehiculos", vehiculo.id), {
+          marca: marca.trim(),
+          modelo: modelo.trim(),
+          patente: patente.trim(),
+          año: año.trim() || null,
+        });
+        setSuccess(true);
+        if (typeof onVehiculoEdited === 'function') {
+          onVehiculoEdited({
+            id: vehiculo.id,
+            marca: marca.trim(),
+            modelo: modelo.trim(),
+            patente: patente.trim(),
+            año: año.trim() || null,
+          });
+        }
+      } else {
+        // Modo agregar: crear nuevo
+        const patenteQuery = query(
+          collection(db, "vehiculos"),
+          where("patente", "==", patente.trim()),
+          where("companyId", "==", companyId)
+        );
+        const existingPatenteSnap = await getDocs(patenteQuery);
 
-      if (!existingPatenteSnap.empty) {
-        setError("Ya existe un vehículo registrado con esa patente.");
-        setLoading(false);
-        return;
-      }
+        if (!existingPatenteSnap.empty) {
+          setError("Ya existe un vehículo registrado con esa patente.");
+          setLoading(false);
+          return;
+        }
 
-      const rawVehiculo = {
-        marca: marca.trim(),
-        modelo: modelo.trim(),
-        patente: patente.trim(),
-        año: año.trim() || null,
-        companyId,
-        createdAt: serverTimestamp(),
-      };
-      
-      const cleanVehiculo = cleanFirestoreData(rawVehiculo);
-      
-      await addDoc(collection(db, "vehiculos"), cleanVehiculo);
-      
-      setMarca("");
-      setModelo("");
-      setPatente("");
-      setAño("");
+        const rawVehiculo = {
+          marca: marca.trim(),
+          modelo: modelo.trim(),
+          patente: patente.trim(),
+          año: año.trim() || null,
+          companyId,
+          createdAt: serverTimestamp(),
+        };
+        
+        const cleanVehiculo = cleanFirestoreData(rawVehiculo);
+        
+        await addDoc(collection(db, "vehiculos"), cleanVehiculo);
+        
+        setMarca("");
+        setModelo("");
+        setPatente("");
+        setAño("");
 
-      setSuccess(true);
-      if (typeof onVehiculoAdded === 'function') {
-        onVehiculoAdded();
+        setSuccess(true);
+        if (typeof onVehiculoAdded === 'function') {
+          onVehiculoAdded();
+        }
       }
     } catch (err) {
-      console.error("Error al agregar vehículo:", err);
+      console.error("Error al guardar vehículo:", err);
       setError("Error al guardar los datos. Intenta nuevamente.");
     } finally {
       setLoading(false);
@@ -95,7 +127,7 @@ const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId }) => {
   return (
     <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
       <Typography variant="h6" gutterBottom>
-        Agregar Nuevo Vehículo
+        {modoEdicion ? 'Editar Vehículo' : 'Agregar Nuevo Vehículo'}
       </Typography>
 
       {error && (
@@ -154,7 +186,7 @@ const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId }) => {
               sx={{ mt: 2 }}
               fullWidth
             >
-              {loading ? <CircularProgress size={24} /> : "Agregar Vehículo"}
+              {loading ? <CircularProgress size={24} /> : (modoEdicion ? 'Guardar Cambios' : 'Agregar Vehículo')}
             </Button>
           </Grid>
         </Grid>

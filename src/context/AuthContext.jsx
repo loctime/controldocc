@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { auth, db } from "../firebaseconfig";
 import { onAuthStateChanged } from "firebase/auth";
@@ -20,22 +21,22 @@ export const AuthProvider = ({ children }) => {
       if (!firebaseUser) {
         console.log('[AuthContext] No hay usuario autenticado');
         setUser(null);
-        return setLoading(false);
+        setLoading(false);
+        return;
       }
 
       try {
         console.log('[AuthContext] Obteniendo datos de Firestore para:', firebaseUser.uid);
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        
-        console.log('[AuthContext] Datos obtenidos:', {
-          exists: userDoc.exists(),
-          data: userDoc.exists() ? userDoc.data() : null
-        });
 
-        const userData = userDoc.exists() ? userDoc.data() : {
-          role: "user",
-          companyId: null
-        };
+        if (!userDoc.exists()) {
+          console.warn('[AuthContext] Usuario no existe en Firestore');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const userData = userDoc.data();
 
         console.log('[AuthContext] Datos combinados del usuario:', {
           ...firebaseUser,

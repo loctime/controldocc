@@ -17,10 +17,12 @@ import {
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { AuthContext } from "../../context/AuthContext";
 
-const PersonalForm = ({ onPersonalAdded, companyId: propCompanyId }) => {
-  const [nombre, setNombre] = useState("");
-  const [apellido, setApellido] = useState("");
-  const [dni, setDni] = useState("");
+import { doc, updateDoc } from "firebase/firestore";
+
+const PersonalForm = ({ onPersonalAdded, companyId: propCompanyId, modoEdicion = false, persona = null, onPersonalEdited }) => {
+  const [nombre, setNombre] = useState(persona ? persona.nombre : "");
+  const [apellido, setApellido] = useState(persona ? persona.apellido : "");
+  const [dni, setDni] = useState(persona ? persona.dni : "");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +31,15 @@ const PersonalForm = ({ onPersonalAdded, companyId: propCompanyId }) => {
   const companyId = propCompanyId || userCompanyData?.companyId;
 
   const { user: currentUser } = useContext(AuthContext);
+
+  // Actualiza los campos si cambia la persona a editar
+  React.useEffect(() => {
+    if (modoEdicion && persona) {
+      setNombre(persona.nombre || "");
+      setApellido(persona.apellido || "");
+      setDni(persona.dni || "");
+    }
+  }, [modoEdicion, persona]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,46 +63,62 @@ const PersonalForm = ({ onPersonalAdded, companyId: propCompanyId }) => {
     setError("");
 
     try {
-      // 🔥 Verificar si ya existe un DNI igual en esta empresa
-      const dniQuery = query(
-        collection(db, "personal"),
-        where("dni", "==", dni.trim()),
-        where("companyId", "==", companyId)
-      );
-      const existingDniSnap = await getDocs(dniQuery);
+      if (modoEdicion && persona && persona.id) {
+        // Modo edición: actualizar persona existente
+        await updateDoc(doc(db, "personal", persona.id), {
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          dni: dni.trim(),
+        });
+        setSuccess(true);
+        if (typeof onPersonalEdited === 'function') {
+          onPersonalEdited({
+            id: persona.id,
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            dni: dni.trim(),
+          });
+        }
+      } else {
+        // Modo agregar: crear nuevo
+        const dniQuery = query(
+          collection(db, "personal"),
+          where("dni", "==", dni.trim()),
+          where("companyId", "==", companyId)
+        );
+        const existingDniSnap = await getDocs(dniQuery);
 
-      if (!existingDniSnap.empty) {
-        setError("Ya existe un empleado registrado con ese DNI.");
-        setLoading(false);
-        return;
-      }
+        if (!existingDniSnap.empty) {
+          setError("Ya existe un empleado registrado con ese DNI.");
+          setLoading(false);
+          return;
+        }
 
-      const rawData = {
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        dni: dni.trim(),
-        companyId,
-        createdAt: serverTimestamp(),
-        createdBy: currentUser?.uid || null,
-      };
-      
-      const docData = Object.fromEntries(
-        Object.entries(rawData).filter(([_, v]) => v !== undefined)
-      );
-      
-await addDoc(collection(db, "personal"), docData);
+        const rawData = {
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          dni: dni.trim(),
+          companyId,
+          createdAt: serverTimestamp(),
+          createdBy: currentUser?.uid || null,
+        };
+        
+        const docData = Object.fromEntries(
+          Object.entries(rawData).filter(([_, v]) => v !== undefined)
+        );
+        
+        await addDoc(collection(db, "personal"), docData);
 
-      
-
-      setNombre("");
-      setApellido("");
-      setDni("");
-      setSuccess(true);
-      if (typeof onPersonalAdded === 'function') {
-        onPersonalAdded();
+        setNombre("");
+        setApellido("");
+        setDni("");
+        setSuccess(true);
+        if (typeof onPersonalAdded === 'function') {
+          onPersonalAdded();
+        }
       }
     } catch (err) {
-      console.error("Error al agregar personal:", err);
+      console.error("Error al guardar personal:", err);
       setError("Error al guardar los datos. Intenta nuevamente.");
     } finally {
       setLoading(false);
@@ -105,7 +132,7 @@ await addDoc(collection(db, "personal"), docData);
   return (
     <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
       <Typography variant="h6" gutterBottom>
-        Agregar Nuevo Personal
+        {modoEdicion ? 'Editar Persona' : 'Agregar Nuevo Personal'}
       </Typography>
 
       {error && (
@@ -152,7 +179,7 @@ await addDoc(collection(db, "personal"), docData);
               sx={{ mt: 2 }}
               fullWidth
             >
-              {loading ? <CircularProgress size={24} /> : "Agregar Personal"}
+              {loading ? <CircularProgress size={24} /> : (modoEdicion ? 'Guardar Cambios' : 'Agregar Personal')}
             </Button>
           </Grid>
         </Grid>

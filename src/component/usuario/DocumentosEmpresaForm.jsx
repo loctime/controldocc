@@ -43,13 +43,7 @@ export default function DocumentosEmpresaForm({ onDocumentUploaded }) {
 
   useEffect(() => {
     if (loading) return;
-    console.log({
-      currentUser: currentUser ? currentUser.email : null,
-      hasFile: !!fileMap[selectedDocument?.id],
-      uploading,
-      loading,
-      selectedDocument: selectedDocument?.id
-    });
+    
     if (!companyId || loading || !currentUser) return;
 
   const fetchDocuments = async () => {
