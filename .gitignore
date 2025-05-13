@@ -7,17 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# Dependencies
 dist
 dist-ssr
 *.local
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.production
+.env*.backup
 
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -27,6 +28,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-control-doc-4959a-firebase-adminsdk-fbsvc-cb3a6c943d.json
-.docketignore
 
+# Security
+*.key
+*.pem
+*.cert
+*.json
+
+# Firebase
+firebase-*.json
+*-firebase-adminsdk-*.json
+
+# Docker
+.dockerignore
+Dockerfile
+
+# System
+Thumbs.db
+node_modules
