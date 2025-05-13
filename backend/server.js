@@ -5,7 +5,7 @@ import cors from 'cors';
 import { db } from './firebaseconfig.js';
 
 const app = express();
-const port = 3004;
+const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
