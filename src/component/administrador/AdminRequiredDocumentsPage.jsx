@@ -52,7 +52,8 @@ export default function AdminRequiredDocumentsPage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [expirationDate, setExpirationDate] = useState("");
 
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompany } = useCompanies();
+const selectedCompanyId = selectedCompany?.id || selectedCompany;
   const theme = useTheme();
 
   const [validationErrors, setValidationErrors] = useState({

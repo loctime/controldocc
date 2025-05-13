@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../../../../firebaseconfig';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
-export default function useDashboardData(companyIdFromLocalStorage) {
+export default function useDashboardData(companyIdFromLocalStorage, personalRefresh = 0, vehiculosRefresh = 0) {
   const [company, setCompany] = useState(null);
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
@@ -13,6 +13,7 @@ export default function useDashboardData(companyIdFromLocalStorage) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    console.log('[useDashboardData] Refrescando datos de personal y vehículos', { companyIdFromLocalStorage, personalRefresh, vehiculosRefresh });
     if (!companyIdFromLocalStorage) {
       setError("No se encontró la empresa asignada.");
       setLoading(false);
@@ -20,7 +21,7 @@ export default function useDashboardData(companyIdFromLocalStorage) {
     }
 
     fetchAllData(companyIdFromLocalStorage);
-  }, [companyIdFromLocalStorage]);
+  }, [companyIdFromLocalStorage, personalRefresh, vehiculosRefresh]);
 
   const fetchAllData = async (companyId) => {
     setLoading(true);

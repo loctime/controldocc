@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 
-const VehiculosForm = () => {
+const VehiculosForm = ({ onVehiculoAdded, companyId: propCompanyId }) => {
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [patente, setPatente] = useState("");
@@ -33,7 +33,7 @@ const VehiculosForm = () => {
     }
 
     const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
-    const companyId = userCompanyData?.companyId;
+    const companyId = propCompanyId || userCompanyData?.companyId;
 
     if (!companyId) {
       setError("No tienes empresa asociada. No se puede agregar vehículo.");
@@ -77,6 +77,9 @@ const VehiculosForm = () => {
       setAño("");
 
       setSuccess(true);
+      if (typeof onVehiculoAdded === 'function') {
+        onVehiculoAdded();
+      }
     } catch (err) {
       console.error("Error al agregar vehículo:", err);
       setError("Error al guardar los datos. Intenta nuevamente.");
@@ -103,7 +106,7 @@ const VehiculosForm = () => {
 
       <Box component="form" onSubmit={handleSubmit}>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid columns={12} columnSpacing={2}>
             <TextField
               fullWidth
               label="Marca *"
@@ -112,7 +115,7 @@ const VehiculosForm = () => {
               disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid columns={12} columnSpacing={2}>
             <TextField
               fullWidth
               label="Modelo *"
@@ -121,7 +124,7 @@ const VehiculosForm = () => {
               disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid columns={12} columnSpacing={2}>
             <TextField
               fullWidth
               label="Patente *"
@@ -130,7 +133,7 @@ const VehiculosForm = () => {
               disabled={loading}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid columns={12} columnSpacing={2}>
             <TextField
               fullWidth
               label="Año"

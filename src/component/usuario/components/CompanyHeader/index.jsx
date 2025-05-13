@@ -15,7 +15,7 @@ export default function CompanyHeader({ company }) {
     }}>
       <Logo companyId={company.id} height={80} variant="company" sx={{ flexShrink: 0 }} />
       <Box sx={{ flex: 1, minWidth: 200 }}>
-        <Typography variant="h6" fontWeight="bold">{company.name}</Typography>
+        <Typography variant="h6" fontWeight="bold">{company.companyName || company.name}</Typography>
         <Typography variant="subtitle1" color="textSecondary">
           CUIT: {company.cuit || "No registrado"}
         </Typography>

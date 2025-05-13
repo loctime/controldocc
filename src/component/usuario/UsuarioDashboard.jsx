@@ -55,9 +55,16 @@ import VehiculosPanel from './components/VehiculosPanel';
 import { getDeadlineColor } from '../../utils/getDeadlineColor';
 
 const UsuarioDashboard = () => {
-  const userCompanyData = JSON.parse(localStorage.getItem('userCompany'));
-  const companyId = userCompanyData?.companyId;
+  const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
+  const companyId = userCompanyData && typeof userCompanyData.companyId === 'string' && userCompanyData.companyId.trim() !== '' ? userCompanyData.companyId : null;
+  if (!companyId) {
+    return <Alert severity="error">No se encontró la empresa asignada. Por favor, vuelve a iniciar sesión o contacta al administrador.</Alert>;
+  }
   const { user: currentUser } = useContext(AuthContext);  
+  const [personalRefresh, setPersonalRefresh] = useState(0);
+
+  const [vehiculosRefresh, setVehiculosRefresh] = useState(0);
+
   const {
     company,
     requiredDocuments,
@@ -67,10 +74,18 @@ const UsuarioDashboard = () => {
     loading,
     error,
     refreshUploadedDocuments
-  } = useDashboardData(companyId);
+  } = useDashboardData(companyId, personalRefresh, vehiculosRefresh);
 
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [tabValue, setTabValue] = useState(0);
+  // Refresco automático de la pestaña Personal
+  useEffect(() => {
+    if (tabValue !== 3) return;
+    const interval = setInterval(() => {
+      refreshUploadedDocuments && refreshUploadedDocuments();
+    }, 10000); // 10 segundos
+    return () => clearInterval(interval);
+  }, [tabValue, refreshUploadedDocuments]);
   const [openDocumentosDialog, setOpenDocumentosDialog] = useState(false);
 
   const handleTabChange = (event, newValue) => {
@@ -87,7 +102,7 @@ const UsuarioDashboard = () => {
     });
   };
 
-  if (loading) {
+  if (loading && personal.length === 0 && vehiculos.length === 0) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
         <CircularProgress />
@@ -195,14 +210,13 @@ const UsuarioDashboard = () => {
       )}
       {tabValue === 3 && (
         <PersonalPanel
-          personal={personal || []}
+          personal={personal}
+          onPersonalAdded={() => setPersonalRefresh(k => k + 1)}
           requiredDocuments={requiredDocuments || []}
           uploadedDocuments={uploadedDocuments || []}
           hasWarningsForPerson={hasWarningsForPerson}
           refreshUploadedDocuments={refreshUploadedDocuments}
           getDeadlineColor={getDeadlineColor}
-        
-
         />
       )}
       {tabValue === 2 && (
@@ -212,6 +226,7 @@ const UsuarioDashboard = () => {
           uploadedDocuments={uploadedDocuments || []}
           refreshUploadedDocuments={refreshUploadedDocuments}
           getDeadlineColor={getDeadlineColor}
+          onVehiculoAdded={() => setVehiculosRefresh(k => k + 1)}
         />
       )}
       <DocumentosEmpresaForm onDocumentUploaded={refreshUploadedDocuments} />

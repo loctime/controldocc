@@ -37,7 +37,8 @@ const DocumentTemplateManager = ({ onApplyTemplate, currentDocuments }) => {
   const [templateName, setTemplateName] = useState("");
   const [openTemplatesDialog, setOpenTemplatesDialog] = useState(false);
   
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompany } = useCompanies();
+const selectedCompanyId = selectedCompany?.id || selectedCompany;
 
   // Cargar plantillas existentes usando useCallback para evitar recreaciones innecesarias
   const loadTemplates = useCallback(async () => {

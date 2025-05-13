@@ -3,6 +3,7 @@ import AppRouter from "./router/AppRouter";
 import "./App.css";
 import { CompaniesProvider } from "./context/CompaniesContext";
 import { useEffect } from "react";
+import ForceLogoutOnMount from "./ForceLogoutOnMount";
 
 function App() {
   useEffect(() => {
@@ -27,6 +28,7 @@ function App() {
   return (
     <CompaniesProvider>
       <AuthProvider>
+        <ForceLogoutOnMount />
         <AppRouter />
       </AuthProvider>
     </CompaniesProvider>

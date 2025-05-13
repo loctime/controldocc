@@ -1,4 +1,6 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import { getDocs, query, collection, where } from 'firebase/firestore';
+import { db } from '../../../../firebaseconfig';
 import { getDeadlineColor } from '../../../../utils/getDeadlineColor';
 import { 
   Paper, Typography, Button, Stack, 
@@ -16,18 +18,36 @@ import { AuthContext } from '../../../../context/AuthContext';
 
 
 export default function PersonalPanel({
-  personal,
+  personal = [],
+  onPersonalAdded,
   requiredDocuments,
   uploadedDocuments,
   hasWarningsForPerson,
   refreshUploadedDocuments,
-  getDeadlineColor
+  getDeadlineColor,
+  companyId
 }) {
+  const [formKey, setFormKey] = useState(0);
+
+
+
+  // Esta función será llamada después de agregar personal
+  const handlePersonalAdded = () => {
+    setFormKey(prev => prev + 1); // Fuerza el remount
+    if (typeof onPersonalAdded === 'function') {
+      onPersonalAdded();
+    }
+    refreshUploadedDocuments && refreshUploadedDocuments();
+  };
+
+
   const [showImportPersonal, setShowImportPersonal] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [openDocumentosDialog, setOpenDocumentosDialog] = useState(false);
   const { user: currentUser } = useContext(AuthContext);
+
+
 
   return (
     <>
@@ -51,7 +71,7 @@ export default function PersonalPanel({
       {showImportPersonal ? (
         <PersonalImportForm />
       ) : (
-        <PersonalForm companyId={currentUser.companyId} />
+        <PersonalForm key={formKey} companyId={companyId} onPersonalAdded={handlePersonalAdded} />
       )}
       
       <Paper elevation={2} sx={{ p: 3 }}>

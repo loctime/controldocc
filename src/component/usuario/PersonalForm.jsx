@@ -17,7 +17,7 @@ import {
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { AuthContext } from "../../context/AuthContext";
 
-const PersonalForm = () => {
+const PersonalForm = ({ onPersonalAdded, companyId: propCompanyId }) => {
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [dni, setDni] = useState("");
@@ -26,7 +26,7 @@ const PersonalForm = () => {
   const [error, setError] = useState("");
 
   const userCompanyData = JSON.parse(localStorage.getItem('userCompany') || '{}');
-  const companyId = userCompanyData?.companyId;
+  const companyId = propCompanyId || userCompanyData?.companyId;
 
   const { user: currentUser } = useContext(AuthContext);
 
@@ -35,6 +35,11 @@ const PersonalForm = () => {
 
     if (!nombre.trim() || !apellido.trim() || !dni.trim()) {
       setError("Por favor completa los campos obligatorios");
+      return;
+    }
+    // Validación estricta de DNI
+    if (!/^[0-9]{7,8}$/.test(dni.trim())) {
+      setError("El DNI debe tener 7 u 8 números y solo contener dígitos.");
       return;
     }
 
@@ -65,7 +70,7 @@ const PersonalForm = () => {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         dni: dni.trim(),
-        companyId: currentUser.companyId,
+        companyId,
         createdAt: serverTimestamp(),
         createdBy: currentUser?.uid || null,
       };
@@ -82,6 +87,9 @@ await addDoc(collection(db, "personal"), docData);
       setApellido("");
       setDni("");
       setSuccess(true);
+      if (typeof onPersonalAdded === 'function') {
+        onPersonalAdded();
+      }
     } catch (err) {
       console.error("Error al agregar personal:", err);
       setError("Error al guardar los datos. Intenta nuevamente.");

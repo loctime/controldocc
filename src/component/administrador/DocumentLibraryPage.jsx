@@ -38,7 +38,9 @@ export default function DocumentLibraryPage() {
   const [viewFileName, setViewFileName] = useState('');
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const { selectedCompanyId, setSelectedCompanyId } = useCompany();
+  const { selectedCompany, refresh, selectCompany, clearSelection } = useCompanies();
+const selectedCompanyId = selectedCompany?.id || selectedCompany;
+const setSelectedCompanyId = selectCompany;
   const { user } = useContext(AuthContext);
   const [companies, setCompanies] = useState([]);
   

@@ -15,7 +15,8 @@ export default function VehiculosPanel({
   requiredDocuments,
   uploadedDocuments,
   refreshUploadedDocuments,
-  getDeadlineColor
+  getDeadlineColor,
+  onVehiculoAdded
 }) {
   const [selectedVehiculo, setSelectedVehiculo] = useState(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
@@ -26,9 +27,19 @@ export default function VehiculosPanel({
   }, [refreshUploadedDocuments]);
 
 console.log(requiredDocuments);
+  const [formKey, setFormKey] = useState(0);
+
+  const handleVehiculoAdded = () => {
+    setFormKey(k => k + 1); // Fuerza remount del formulario
+    if (typeof onVehiculoAdded === 'function') {
+      onVehiculoAdded(); // Refresca el listado real en el padre
+    }
+    refreshUploadedDocuments && refreshUploadedDocuments(); // Refresca documentos si corresponde
+  };
+
   return (
     <>
-      <VehiculosForm />
+      <VehiculosForm key={formKey} companyId={undefined} onVehiculoAdded={handleVehiculoAdded} />
       
       <EntidadPanel
   title={`Vehículos Registrados (${vehiculos.length})`}

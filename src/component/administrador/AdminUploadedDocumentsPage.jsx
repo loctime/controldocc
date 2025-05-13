@@ -29,7 +29,8 @@ export default function AdminUploadedDocumentsPage() {
   const [showSemaphoreInfo, setShowSemaphoreInfo] = useState(false);
   const [dialogAccion, setDialogAccion] = useState(null); // { tipo: 'aprobar' | 'rechazar', doc }
   const documentRefs = useRef({});
-  const { selectedCompanyId, selectCompany } = useCompany();
+  const { selectedCompany, selectCompany } = useCompanies();
+const selectedCompanyId = selectedCompany?.id || selectedCompany;
   const { user } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
 const initialFilter = searchParams.get("filter") || "todos";
