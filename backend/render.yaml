@@ -1,0 +1,13 @@
+services:
+  - name: controldocc-backend
+    type: web
+    runtime: node
+    nodeVersion: 22.14.0
+    buildCommand: npm run install-render
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3004
+    healthCheckPath: /api/health
