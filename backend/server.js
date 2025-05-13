@@ -15,7 +15,12 @@ app.use(express.json());
 // ✅ Ruta de subida de archivos
 app.use('/api', uploadRoute(upload));
 
-// ✅ Ruta de salud
+// ✅ Ruta de ping para mantener vivo el servidor (UptimeRobot)
+app.get('/api/ping', (req, res) => {
+  res.send('pong');
+});
+
+// ✅ Ruta de salud extendida
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'active', 
