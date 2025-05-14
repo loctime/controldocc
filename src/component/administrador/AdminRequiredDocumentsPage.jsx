@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { db, } from "../../firebaseconfig";
+import { getAuth } from "firebase/auth";
+import { db } from "../../firebaseconfig";
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { useCompanies } from "../../context/CompaniesContext";
 import DocumentTemplateManager from "./DocumentTemplateManager";
-import ErrorBoundary from "../../components/common/ErrorBoundary";
-import { getAuth } from "firebase/auth";
+import FileUploader from "../../components/common/FileUploader";
+import { uploadFile } from "../../utils/FileUploadService";
 import {
   Box,
   Typography,
@@ -32,6 +33,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  FormHelperText,
   useTheme
 } from "@mui/material";
 import {
@@ -39,6 +41,7 @@ import {
   Delete as DeleteIcon,
   Description as DescriptionIcon,
 } from "@mui/icons-material";
+import { PictureAsPdf as PictureAsPdfIcon } from '@mui/icons-material';
 
 export default function AdminRequiredDocumentsPage() {
   const [documents, setDocuments] = useState([]);
@@ -51,9 +54,12 @@ export default function AdminRequiredDocumentsPage() {
   const [imagePreview, setImagePreview] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [expirationDate, setExpirationDate] = useState("");
+  const [comment, setComment] = useState("");
+  const [file, setFile] = useState(null);
+  const [fileType, setFileType] = useState('');
 
   const { selectedCompany } = useCompanies();
-const selectedCompanyId = selectedCompany?.id || selectedCompany;
+  const selectedCompanyId = selectedCompany?.id || selectedCompany;
   const theme = useTheme();
 
   const [validationErrors, setValidationErrors] = useState({
@@ -94,57 +100,56 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
   const handleCreateDocument = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
-
+  
     setLoading(true);
     setError("");
+  
     try {
-      let exampleImageUrl = "";
-      if (exampleImage) {
-        if (typeof exampleImage !== "string") {
-          const formData = new FormData();
-          formData.append("file", exampleImage);
-          formData.append("folder", "documentExamples");
-          const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-          const res = await fetch(`${apiUrl}/api/upload`, {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-          exampleImageUrl = data.url;
-        } else {
-          exampleImageUrl = exampleImage;
-        }
-      }
-      
+      const auth = getAuth();
+      const user = auth.currentUser;
+  
       const newDocument = {
         name: newDocName.trim(),
         entityType,
         companyId: selectedCompanyId,
         allowedFileTypes: [".pdf", ".jpg", ".jpeg", ".png"],
-        deadline: {
-          date: expirationDate
-        },
-        exampleImage: exampleImageUrl || "",
+        deadline: { date: expirationDate },
+        exampleImage: exampleImage || "",
+        comentario: comment || "",
         createdAt: new Date().toISOString(),
+        subidoDesde: "frontend",
+        subidoPorUid: user?.uid || "",
+        subidoPorEmail: user?.email || ""
       };
-
+  
       await addDoc(collection(db, "requiredDocuments"), newDocument);
-
-      // Limpiar formulario
-      setNewDocName("");
-      setEntityType("company");
-      setExpirationDate("");
-      setExampleImage(null);
-      setImagePreview("");
-
       await loadDocuments();
+      resetForm();
     } catch (error) {
-      console.error("Error creating document:", error);
-      setError("Error al crear el documento.");
+      setError("Error al crear documento: " + error.message);
     } finally {
       setLoading(false);
     }
   };
+
+
+  const handleFileUpload = async (selectedFile) => {
+    try {
+      setIsUploadingImage(true);
+      setFile(selectedFile);
+      setFileType(selectedFile.type.startsWith('image/') ? 'image' : 'pdf');
+      setImagePreview(URL.createObjectURL(selectedFile));
+      
+      const result = await uploadFile(selectedFile, "admin/document_examples");
+      setExampleImage(result.url);
+    } catch (error) {
+      setError(`Error al subir archivo: ${error.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+
 
   const validateForm = () => {
     const errors = {
@@ -156,52 +161,18 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
     return !Object.values(errors).some(error => error);
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-  
-    try {
-      setIsUploadingImage(true);
-  
-      // Vista previa dinámica
-      if (file.type === "application/pdf") {
-        setImagePreview("/pdf-preview.png"); // 📄 ícono genérico para PDF
-      } else {
-        setImagePreview(URL.createObjectURL(file));
-      }
-  
-      const user = getAuth().currentUser;
-      const token = user && await user.getIdToken();
-      if (!token) throw new Error("Usuario no autenticado");
-  
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "documentExamples");
-  
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      const res = await fetch(`${apiUrl}/api/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-  
-      const data = await res.json();
-      if (res.ok) {
-        setExampleImage(data.url); // ✅ URL que se guarda en Firestore
-      } else {
-        throw new Error(data.message || "Upload failed");
-      }
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      setError("Error al subir la imagen de ejemplo");
-    } finally {
-      setIsUploadingImage(false);
-    }
+  const resetForm = () => {
+    setNewDocName("");
+    setEntityType("company");
+    setExpirationDate("");
+    setExampleImage(null);
+    setImagePreview("");
+    setComment("");
   };
 
   const handlePasteImage = (e) => {
     const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i <items.length; i++) {
       if (items[i].type.indexOf("image") !== -1) {
         const blob = items[i].getAsFile();
         const imageUrl = URL.createObjectURL(blob);
@@ -267,8 +238,10 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
             onChange={(e) => setNewDocName(e.target.value)}
             fullWidth
             disabled={loading || !selectedCompanyId}
+            error={!!validationErrors.name}
+            helperText={validationErrors.name}
           />
-          <FormControl sx={{ minWidth: 200 }}>
+          <FormControl sx={{ minWidth: 200 }} error={!!validationErrors.entityType}>
             <InputLabel>Aplicable a</InputLabel>
             <Select
               value={entityType}
@@ -280,13 +253,9 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
               <MenuItem value="employee">Empleado (uno por cada persona)</MenuItem>
               <MenuItem value="vehicle">Vehículo (uno por cada vehículo)</MenuItem>
             </Select>
-            <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'text.secondary' }}>
-              {entityType === 'employee' ? 
-                'Este documento deberá ser subido para cada empleado registrado por la empresa.' :
-              entityType === 'vehicle' ? 
-                'Este documento deberá ser subido para cada vehículo registrado por la empresa.' :
-                'Este documento se aplica a la empresa en general.'}
-            </Typography>
+            {validationErrors.entityType && (
+              <FormHelperText>{validationErrors.entityType}</FormHelperText>
+            )}
           </FormControl>
           <TextField
             label="Fecha de vencimiento"
@@ -300,47 +269,135 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
             error={!!validationErrors.deadline}
             helperText={validationErrors.deadline}
           />
+          <Grid container spacing={2}>
+  <Grid item xs={12} md={6}>
+    <TextField
+      label="Comentario (opcional)"
+      value={comment}
+      onChange={(e) => setComment(e.target.value)}
+      fullWidth
+      multiline
+      rows={3}
+    />
+  </Grid>
+
+  <Grid item xs={12} md={6}>
+    {imagePreview ? (
+      <Box
+        sx={{
+          border: '1px solid #ccc',
+          borderRadius: 2,
+          p: 1,
+          textAlign: 'center',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden'
+        }}
+      >
+        {fileType === 'image' ? (
+          <img
+            src={imagePreview}
+            alt="Vista previa"
+            style={{ maxWidth: "100%", maxHeight: 150, borderRadius: 8 }}
+          />
+        ) : fileType === 'pdf' ? (
+          <Box sx={{ textAlign: 'center' }}>
+            <Box 
+              component="iframe"
+              src={imagePreview} 
+              style={{ 
+                width: '100%', 
+                height: 150, 
+                border: 'none',
+                borderRadius: 8,
+                mb: 1,
+                cursor: 'pointer'
+              }}
+              title="Vista previa PDF"
+              onClick={() => window.open(imagePreview, '_blank')}
+            />
+            <Typography 
+              variant="caption" 
+              display="block"
+              sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => window.open(imagePreview, '_blank')}
+            >
+              {file?.name || 'Documento PDF'} (click para abrir completo)
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              border: '1px dashed #ccc',
+              borderRadius: 2,
+              height: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'text.secondary'
+            }}
+          >
+            Sin vista previa
+          </Box>
+        )}
+      </Box>
+    ) : (
+      <Box
+        sx={{
+          border: '1px dashed #ccc',
+          borderRadius: 2,
+          height: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'text.secondary'
+        }}
+      >
+        Sin vista previa
+      </Box>
+    )}
+  </Grid>
+</Grid>
+
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle2">Imagen de ejemplo (opcional)</Typography>
-            <Box 
-              sx={{ 
-                border: '1px dashed', 
-                borderColor: 'divider', 
-                p: 2, 
-                borderRadius: 1,
-                minHeight: 100,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                position: 'relative'
-              }}
-              onPaste={handlePasteImage}
-            >
-              {imagePreview ? (
-                <img 
-                  src={imagePreview} 
-                  alt="Ejemplo de documento" 
-                  style={{ maxWidth: '100%', maxHeight: 200 }} 
-                />
-              ) : (
-                <Typography textAlign="center" color="text.secondary">
-                  Pega una imagen aquí o sube un archivo
-                </Typography>
-              )}
-              <input
-                type="file"
-                accept=".pdf,image/*"
-                onChange={handleImageUpload}
-                style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                disabled={isUploadingImage}
-              />
+            <Box>
+  <Button variant="contained" component="label">
+    Seleccionar archivo (PDF o imagen)
+    <input
+      type="file"
+      hidden
+      accept=".pdf,.jpg,.jpeg,.png,image/*"
+      onChange={(e) => {
+        const selected = e.target.files[0];
+        if (selected) {
+          // Validar tipo y tamaño
+          const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+          const maxSize = 5 * 1024 * 1024; // 5MB
+          
+          if (!validTypes.includes(selected.type)) {
+            setError('Solo se permiten PDFs o imágenes (JPEG/PNG)');
+            return;
+          }
+          
+          if (selected.size > maxSize) {
+            setError('El archivo no debe exceder los 5MB');
+            return;
+          }
+          
+          handleFileUpload(selected);
+        }
+      }}
+    />
+  </Button>
+</Box>
 
-            </Box>
             {isUploadingImage && (
               <Box display="flex" alignItems="center" gap={1}>
                 <CircularProgress size={20} />
-                <Typography variant="caption">Subiendo imagen...</Typography>
+                <Typography variant="caption">Subiendo archivo...</Typography>
               </Box>
             )}
           </Box>
@@ -417,11 +474,22 @@ const selectedCompanyId = selectedCompany?.id || selectedCompany;
                   </Box>
                   <Divider sx={{ my: 1.5 }} />
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Aplicable a:</strong> {doc.entityType}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Vencimiento:</strong> {doc.deadline?.date ? new Date(doc.deadline.date).toLocaleDateString() : 'Sin fecha'}
-                  </Typography>
+  <strong>Aplicable a:</strong> {doc.entityType}
+</Typography>
+<Typography variant="body2" color="text.secondary">
+  <strong>Vencimiento del documento:</strong>{" "}
+  {doc.vencimiento
+    ? new Date(doc.vencimiento).toLocaleDateString()
+    : doc.deadline?.date
+    ? new Date(doc.deadline.date).toLocaleDateString()
+    : 'Sin fecha'}
+</Typography>
+
+{doc.comentario && (
+  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+    <strong>Comentario:</strong> {doc.comentario}
+  </Typography>
+)}
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'flex-end' }}>
                   <Tooltip title="Eliminar documento">

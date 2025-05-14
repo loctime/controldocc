@@ -364,7 +364,7 @@ if (!currentUser) return <Alert severity="error">Sesión no iniciada.</Alert>;
 
     {fileMap?.[selectedDocument?.id] && (
       <Typography variant="body2" mt={1}>
-        Archivo seleccionado: {fileMap?.[selectedDocument?.id].name}
+        Archivo selecasdcionado: {fileMap?.[selectedDocument?.id].name}
       </Typography>
     )}
 
