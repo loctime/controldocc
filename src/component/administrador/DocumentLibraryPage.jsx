@@ -21,12 +21,12 @@ import {
 import { db, auth } from '../../firebaseconfig';
 import { collection, getDocs, query, where, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useCompanies } from '../../context/CompaniesContext';
-import AdminCompanySelector from './AdminCompanySelector';
 import { AuthContext } from '../../context/AuthContext';
 import VistaDocumentoSubido from './VistaDocumentoSubido';
 import DocumentFilters from './Library/DocumentFilters';
 import DocumentSidebar from './Library/DocumentSidebar';
 import DocumentTable from './Library/DocumentTable';
+import EmpresaTable from './Library/EmpresaTable';
 
 
 // 🔐 Admin role constant

@@ -94,22 +94,44 @@ export default function DocumentosFormBase({
   // Función para subir documentos
   const handleUpload = async () => {
     if (!currentUser || !selectedDocument || !file) return;
+    
+    // Validación previa como en AdminRequiredDocumentsPage
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      alert('Solo se permiten PDF o imágenes (JPEG/PNG)');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('El archivo no debe exceder 5MB');
+      return;
+    }
+
     setUploading(true);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", `${entityType}Documents`);
+      formData.append("entityId", entity.id);
+      formData.append("entityType", entityType);
+      formData.append("documentType", 
+        requiredDocuments.find(d => d.id === selectedDocument)?.name || "Documento"
+      );
 
+      const token = await currentUser.getIdToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/upload`, {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
 
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Error en el servidor");
+      }
       
       const { url, originalName, pdfName } = await response.json();
       const existingDoc = uploadedDocuments.find(d => 
@@ -152,7 +174,7 @@ export default function DocumentosFormBase({
       resetForm();
     } catch (error) {
       console.error("Error al subir documento:", error);
-      alert(`Error al subir documento: ${error.message}`);
+      alert(`Error al subir: ${error.message}`);
     } finally {
       setUploading(false);
       setConfirmDialogOpen(false);

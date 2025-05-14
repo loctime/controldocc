@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCompanies } from "../../context/CompaniesContext";
-import { db, auth } from "../../firebaseconfig";
-import { collection, getDocs } from "firebase/firestore";
+import { auth } from "../../firebaseconfig";
 import { signOut } from "firebase/auth";
 import { styled, useTheme } from "@mui/material/styles";
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
@@ -29,7 +28,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  CircularProgress,
+  CircularProgress
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -50,7 +49,7 @@ const drawerWidth = 180;
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
     flexGrow: 1,
-    padding: theme.spacing(1.5),      // Reduce espacio interno
+    padding: theme.spacing(1.5),
     width: '100%',
     transition: theme.transitions.create('margin', {
       easing: theme.transitions.easing.sharp,
@@ -64,8 +63,6 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
     minHeight: '100vh',
   }),
 );
-
-
 
 const AppBarStyled = styled(AppBar, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
@@ -98,103 +95,51 @@ const DrawerHeader = styled('div')(({ theme }) => ({
 export default function AdminLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState(null);
-  const location = useLocation();
-  const [companies, setCompanies] = useState([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const { selectedCompanyId, selectCompany } = useCompanies();
 
-  const handleDrawerOpen = () => {
-    setOpen(true);
-  };
+  const { companies, selectedCompany, selectCompany, loading: loadingCompanies } = useCompanies();
 
-  const handleDrawerClose = () => {
-    setOpen(false);
-  };
+  const handleDrawerOpen = () => setOpen(true);
+  const handleDrawerClose = () => setOpen(false);
+  const handleProfileMenuOpen = (e) => setAnchorEl(e.currentTarget);
+  const handleProfileMenuClose = () => setAnchorEl(null);
+  const handleNotificationsOpen = (e) => setNotificationsAnchorEl(e.currentTarget);
+  const handleNotificationsClose = () => setNotificationsAnchorEl(null);
 
-  const handleProfileMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleProfileMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleNotificationsOpen = (event) => {
-    setNotificationsAnchorEl(event.currentTarget);
-  };
-
-  const handleNotificationsClose = () => {
-    setNotificationsAnchorEl(null);
-  };
-
-  // Función para cerrar sesión
-const handleLogout = async () => {
-try {
-  await signOut(auth);
-  localStorage.removeItem('userCompany');
-  localStorage.removeItem('isAdminSession'); // Limpiar flag de admin
-  handleProfileMenuClose();
-  navigate('/login');
-  window.location.reload(); // Forzar refresh
-} catch (error) {
-  console.error('Error al cerrar sesión:', error);
-}
-};
-
-  // Cargar las empresas
-  useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  const loadCompanies = async () => {
-    setLoadingCompanies(true);
+  const handleLogout = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "companies"));
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCompanies(list);
+      await signOut(auth);
+      localStorage.removeItem('userCompany');
+      localStorage.removeItem('isAdminSession');
+      handleProfileMenuClose();
+      navigate('/login');
+      window.location.reload();
     } catch (error) {
-      console.error("Error loading companies:", error);
-    } finally {
-      setLoadingCompanies(false);
+      console.error('Error al cerrar sesión:', error);
     }
   };
 
-  // Manejar el cambio de empresa seleccionada
   const handleCompanyChange = (event) => {
     const companyId = event.target.value;
-    // Buscar el nombre de la empresa seleccionada
-    const selectedCompany = companies.find(company => company.id === companyId);
-    // Usar la función selectCompany del contexto para actualizar tanto el ID como el nombre
-    selectCompany(companyId, selectedCompany ? selectedCompany.name : "todas");
+    if (companyId === 'todas') {
+      selectCompany(null);
+      return;
+    }
+    const selected = companies.find(c => String(c.id) === companyId);
+    selectCompany(selected || null);
   };
 
-  // Menú items para la navegación
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'Empresas', icon: <BusinessIcon />, path: '/admin/companies' },
     { text: 'Documentos Requeridos', icon: <DescriptionIcon />, path: '/admin/required-documents' },
-    // Destacamos la opción de Documentos Subidos para hacerla más visible
-    { 
-      text: 'Administrar Documentos', 
-      icon: <UploadIcon color="secondary" />, 
-      path: '/admin/uploaded-documents',
-      highlight: true // Marcamos esta opción para destacarla
-    },
-    { 
-      text: 'Biblioteca', 
-      icon: <LibraryBooksIcon />, 
-      path: '/admin/document-library',
-      highlight: true 
-    },
-    {
-      text: 'Aprobar Empresas',
-      icon: <ApprovalIcon />,
-      path: '/admin/company-approvals'
-    }
-   
+    { text: 'Administrar Documentos', icon: <UploadIcon color="secondary" />, path: '/admin/uploaded-documents', highlight: true },
+    { text: 'Biblioteca', icon: <LibraryBooksIcon />, path: '/admin/document-library', highlight: true },
+    { text: 'Aprobar Empresas', icon: <ApprovalIcon />, path: '/admin/company-approvals' }
   ];
 
   return (
@@ -202,13 +147,7 @@ try {
       <CssBaseline />
       <AppBarStyled position="fixed" open={open}>
         <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            onClick={handleDrawerOpen}
-            edge="start"
-            sx={{ mr: 2, ...(open && { display: 'none' }) }}
-          >
+          <IconButton color="inherit" onClick={handleDrawerOpen} edge="start" sx={{ mr: 2, ...(open && { display: 'none' }) }}>
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ mr: 3 }}>
@@ -219,65 +158,39 @@ try {
           <FormControl sx={{ minWidth: 200, mr: 'auto' }} size="small">
             <InputLabel id="company-select-label">Empresa</InputLabel>
             <Select
-  labelId="company-select-label"
-  value={selectedCompanyId || ''}
-  onChange={handleCompanyChange}
-  label="Empresa"
-  disabled={loadingCompanies}
-  renderValue={(selected) => {
-    if (!selected) return 'Todas las empresas';
-    const company = companies.find(c => c.id === selected);
-    return company?.name || 'Empresa seleccionada';
-  }}
->
-              <MenuItem value="todas">
-                <em>Todas las empresas</em>
-              </MenuItem>
+              labelId="company-select-label"
+              value={selectedCompany ? String(selectedCompany.id) : 'todas'}
+              onChange={handleCompanyChange}
+              label="Empresa"
+              disabled={loadingCompanies}
+              renderValue={(selected) => {
+                if (!selected || selected === 'todas') return 'Todas las empresas';
+                const company = companies.find(c => String(c.id) === selected);
+                return company?.name || 'Empresa seleccionada';
+              }}
+            >
+              <MenuItem value="todas"><em>Todas las empresas</em></MenuItem>
               {companies.map((company) => (
-                <MenuItem key={company.id} value={company.id}>
+                <MenuItem key={company.id} value={String(company.id)}>
                   {company.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          
+
           {/* Notificaciones */}
           <Tooltip title="Notificaciones">
-            <IconButton 
-              color="inherit" 
-              onClick={handleNotificationsOpen}
-              sx={{ mr: 1 }}
-            >
+            <IconButton color="inherit" onClick={handleNotificationsOpen} sx={{ mr: 1 }}>
               <NotificationsIcon />
             </IconButton>
           </Tooltip>
-          
-          <Menu
-            anchorEl={notificationsAnchorEl}
-            open={Boolean(notificationsAnchorEl)}
-            onClose={handleNotificationsClose}
-            PaperProps={{
-              elevation: 0,
-              sx: {
-                overflow: 'visible',
-                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                mt: 1.5,
-                '& .MuiAvatar-root': {
-                  width: 32,
-                  height: 32,
-                  ml: -0.5,
-                  mr: 1,
-                },
-              },
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
+
+          <Menu anchorEl={notificationsAnchorEl} open={Boolean(notificationsAnchorEl)} onClose={handleNotificationsClose}>
             <MenuItem>
               <Typography variant="body2">No hay notificaciones nuevas</Typography>
             </MenuItem>
           </Menu>
-          
+
           {/* Perfil de usuario */}
           <Tooltip title="Perfil de usuario">
             <IconButton onClick={handleProfileMenuOpen} sx={{ p: 0 }}>
@@ -286,51 +199,25 @@ try {
               </Avatar>
             </IconButton>
           </Tooltip>
-          
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleProfileMenuClose}
-            PaperProps={{
-              elevation: 0,
-              sx: {
-                overflow: 'visible',
-                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                mt: 1.5,
-                '& .MuiAvatar-root': {
-                  width: 32,
-                  height: 32,
-                  ml: -0.5,
-                  mr: 1,
-                },
-              },
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
+
+          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleProfileMenuClose}>
             <MenuItem>
-              <ListItemIcon>
-                <PersonIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Mi Perfil</Typography>
             </MenuItem>
             <MenuItem>
-              <ListItemIcon>
-                <SettingsIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Configuración</Typography>
             </MenuItem>
             <Divider />
             <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
               <Typography variant="body2">Cerrar Sesión</Typography>
             </MenuItem>
           </Menu>
         </Toolbar>
       </AppBarStyled>
-      
+
       <Drawer
         sx={{
           width: drawerWidth,
@@ -360,16 +247,15 @@ try {
             const isActive = location.pathname === item.path;
             return (
               <ListItem key={item.text} disablePadding>
-                <ListItemButton 
-                  component={Link} 
+                <ListItemButton
+                  component={Link}
                   to={item.path}
                   sx={{
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' : 
-                                   item.highlight ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.1)' :
+                      item.highlight ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
                     '&:hover': {
                       backgroundColor: 'rgba(255, 255, 255, 0.2)',
                     },
-                    // Si es la opción destacada, agregamos un borde para hacerla más visible
                     ...(item.highlight && {
                       borderLeft: '4px solid',
                       borderColor: theme.palette.secondary.main,
@@ -377,9 +263,7 @@ try {
                     })
                   }}
                 >
-                  <ListItemIcon sx={{ color: '#fff' }}>
-                    {item.icon}
-                  </ListItemIcon>
+                  <ListItemIcon sx={{ color: '#fff' }}>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
                 </ListItemButton>
               </ListItem>
@@ -387,7 +271,7 @@ try {
           })}
         </List>
       </Drawer>
-      
+
       <Main open={open}>
         <DrawerHeader />
         <Outlet />
