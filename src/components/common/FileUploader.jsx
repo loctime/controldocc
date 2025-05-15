@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Button, CircularProgress, Typography } from "@mui/material";
+import { Button, CircularProgress, Typography, Box, TextField } from "@mui/material";
 import { uploadFile } from "../../utils/FileUploadService";
 
 export default function FileUploader({ 
@@ -11,47 +11,44 @@ export default function FileUploader({
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [fileMetadata, setFileMetadata] = useState({ name: '', description: '' });
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
     
-    console.log('[FileUploader] Archivo seleccionado:', {
-      name: file?.name,
-      size: file?.size,
-      type: file?.type,
-      isValid: file instanceof File
-    });
-
     if (!file) {
-      console.error('[FileUploader] Error: No se seleccionó archivo');
       setError("Seleccione un archivo válido");
       return;
     }
 
-    // Validación de tamaño (5MB máximo)
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      console.error(`[FileUploader] Error: Archivo demasiado grande (${file.size} bytes)`);
-      setError("El archivo excede el tamaño máximo (5MB)");
-      return;
-    }
-
     try {
-      await validateFile(file);
-      console.log('[FileUploader] Iniciando subida...', { folder, metadata });
       setIsUploading(true);
       setError(null);
       
-      const result = await uploadFile(file, folder, { metadata });
+      const result = await uploadFile(file, folder, { 
+        metadata: { 
+          ...fileMetadata,
+          fileType: file.type,
+          ...metadata 
+        } 
+      });
       
-      console.log('[FileUploader] Subida exitosa:', result);
-      onUploadComplete(result);
+      onUploadComplete({
+        ...result,
+        fileName: fileMetadata.name || file.name,
+        fileDescription: fileMetadata.description,
+        fileType: file.type
+      });
     } catch (error) {
-      console.error('[FileUploader] Error en subida:', error);
       setError(error.message);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleMetadataChange = (e) => {
+    const { name, value } = e.target;
+    setFileMetadata(prev => ({ ...prev, [name]: value }));
   };
 
   const validateFile = async (file) => {
@@ -69,7 +66,25 @@ export default function FileUploader({
   };
 
   return (
-    <div>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <TextField
+        label="Nombre del archivo"
+        name="name"
+        value={fileMetadata.name}
+        onChange={handleMetadataChange}
+        fullWidth
+        size="small"
+      />
+      <TextField
+        label="Descripción"
+        name="description"
+        value={fileMetadata.description}
+        onChange={handleMetadataChange}
+        fullWidth
+        size="small"
+        multiline
+        rows={2}
+      />
       <Button 
         variant="contained" 
         component="label"
@@ -91,6 +106,6 @@ export default function FileUploader({
       )}
       
       {isUploading && <CircularProgress size={24} sx={{ ml: 2 }} />}
-    </div>
+    </Box>
   );
 }

@@ -6,6 +6,7 @@ import { signOut } from "firebase/auth";
 import { styled, useTheme } from "@mui/material/styles";
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ApprovalIcon from '@mui/icons-material/Approval';
+import StorageIcon from '@mui/icons-material/Storage';
 
 import {
   Box,
@@ -139,6 +140,7 @@ export default function AdminLayout() {
     { text: 'Documentos Requeridos', icon: <DescriptionIcon />, path: '/admin/required-documents' },
     { text: 'Administrar Documentos', icon: <UploadIcon color="secondary" />, path: '/admin/uploaded-documents', highlight: true },
     { text: 'Biblioteca', icon: <LibraryBooksIcon />, path: '/admin/document-library', highlight: true },
+    { text: 'Almacenamiento', icon: <StorageIcon />, path: '/admin/store', highlight: true },
     { text: 'Aprobar Empresas', icon: <ApprovalIcon />, path: '/admin/company-approvals' }
   ];
 

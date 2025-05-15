@@ -6,6 +6,7 @@ import AdminDashboard from './AdminDashboard';
 import AdminUploadedDocumentsPage from './AdminUploadedDocumentsPage';
 import AdminRequiredDocumentsPage from './AdminRequiredDocumentsPage';
 import DocumentLibraryPage from '../DocumentLibraryPage';
+import AdminStore from './AdminStore';
 import { Box, Tabs, Tab, Typography, Paper } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -13,6 +14,7 @@ import {
   Business as BusinessIcon,
   AssignmentTurnedIn as AssignmentTurnedInIcon,
   Folder as FolderIcon,
+  Storage as StorageIcon
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 
@@ -42,7 +44,8 @@ function AdminTabs() {
     { icon: <DashboardIcon />, label: 'Dashboard', content: <AdminDashboard /> },
     { icon: <DescriptionIcon />, label: 'Administrar Documentos', content: <AdminUploadedDocumentsPage /> },
     { icon: <AssignmentTurnedInIcon />, label: 'Documentos Requeridos', content: <AdminRequiredDocumentsPage /> },
-    { icon: <FolderIcon />, label: 'Biblioteca de Documentos', content: <DocumentLibraryPage /> }
+    { icon: <FolderIcon />, label: 'Biblioteca de Documentos', content: <DocumentLibraryPage /> },
+    { icon: <StorageIcon />, label: 'Almacenamiento', content: <AdminStore /> }
   ];
 
   const handleTabChange = (event, newValue) => {

@@ -4,23 +4,42 @@ import { db } from "../../firebaseconfig";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useCompanies } from "../../context/CompaniesContext";
 import { parseFirestoreDate } from "../../utils/dateHelpers";
-import { WarningAmber as WarningAmberIcon } from "@mui/icons-material";
-import { FormControlLabel } from "@mui/material";
-import { Checkbox } from "@mui/material";
-
-import {
-  Box, Typography, Grid, Card, CardContent, Divider, Tooltip,
-  Button, Paper, Chip
+import { 
+  Box, 
+  Typography, 
+  Grid, 
+  Card, 
+  CardContent, 
+  Divider, 
+  Tooltip, 
+  Button, 
+  Paper, 
+  Chip,
+  FormControlLabel,
+  Checkbox,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody
 } from "@mui/material";
-import {
+import { 
   Cancel as CancelIcon,
   Pending as PendingIcon,
-  HourglassEmpty as UploadPendingIcon
+  WarningAmber as WarningAmberIcon,
+  Error as ErrorIcon,
+  Business as BusinessIcon
 } from "@mui/icons-material";
 
 export default function AdminDashboard() {
-  const { selectedCompanyId, companies } = useCompanies();
-  const [stats, setStats] = useState({ totalDocumentos: 0, approvalPending: 0, rejected: 0 });
+  const { selectedCompany, companies, selectCompany } = useCompanies();
+  const selectedCompanyId = selectedCompany?.id || null;
+  const [stats, setStats] = useState({ 
+    totalDocumentos: 0, 
+    approvalPending: 0, 
+    rejected: 0,
+    empresasConPendientes: 0
+  });
   const [showDetails, setShowDetails] = useState(null);
   const [previewDocs, setPreviewDocs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,15 +49,21 @@ export default function AdminDashboard() {
     sinFecha: true,
     conFecha: true
   });
+  const [expandedRow, setExpandedRow] = useState(null);
   
-  const selectedCompanyName = companies.find(c => c.id === selectedCompanyId)?.name || "Todas las empresas";
+  const selectedCompanyName = selectedCompany?.name || selectedCompany?.companyName || "Todas las empresas";
 
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const filters = selectedCompanyId ? [where("companyId", "==", selectedCompanyId)] : [];
+        const filters = [];
+        if (selectedCompanyId) {
+          filters.push(where("companyId", "==", selectedCompanyId));
+        }
+
         const uploadedSnap = await getDocs(query(collection(db, "uploadedDocuments"), ...filters));
+        const companiesMap = new Map();
 
         let approvalPending = 0;
         let rejected = 0;
@@ -46,12 +71,48 @@ export default function AdminDashboard() {
 
         uploadedSnap.forEach(doc => {
           const data = doc.data();
+          const companyId = data.companyId;
+          
+          if (!companiesMap.has(companyId)) {
+            companiesMap.set(companyId, {
+              hasPending: false,
+              hasRejected: false,
+              hasUrgent: false
+            });
+          }
+          
+          const companyData = companiesMap.get(companyId);
+          const exp = parseFirestoreDate(data.expirationDate);
+          const diasRestantes = exp ? Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)) : null;
+          
           if (data.expirationDate) totalConVencimiento++;
-          if (data.status === "Pendiente de revisión") approvalPending++;
-          if (data.status === "Rechazado") rejected++;
+          if (data.status === "Pendiente de revisión") {
+            approvalPending++;
+            companyData.hasPending = true;
+          }
+          if (data.status === "Rechazado") {
+            rejected++;
+            companyData.hasRejected = true;
+          }
+          if (diasRestantes !== null && diasRestantes <= 10) {
+            companyData.hasUrgent = true;
+          }
         });
 
-        setStats({ totalDocumentos: totalConVencimiento, approvalPending, rejected });
+        let empresasConPendientes = 0;
+
+        companiesMap.forEach(company => {
+          if (company.hasPending || company.hasRejected || company.hasUrgent) {
+            empresasConPendientes++;
+          }
+        });
+
+        setStats({ 
+          totalDocumentos: totalConVencimiento, 
+          approvalPending, 
+          rejected,
+          empresasConPendientes
+        });
       } catch (err) {
         console.error("Error fetching stats:", err);
       } finally {
@@ -64,73 +125,102 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchPreview = async () => {
-      if (!showDetails) return;
-      setPreviewDocs([]);
+      if (!showDetails) {
+        setPreviewDocs([]);
+        return;
+      }
+      
       setLoading(true);
 
+      if (showDetails === "TodasEmpresas") {
+        try {
+          const uploadedSnap = await getDocs(collection(db, "uploadedDocuments"));
+          const hoy = new Date();
+
+          const docs = await Promise.all(uploadedSnap.docs.map(async docSnap => {
+            const data = docSnap.data();
+            const exp = parseFirestoreDate(data.expirationDate);
+            const diasRestantes = exp ? Math.ceil((exp - hoy) / (1000 * 60 * 60 * 24)) : null;
+
+            return {
+              id: docSnap.id,
+              companyId: data.companyId,
+              status: data.status || "Sin estado",
+              diasRestantes
+            };
+          }));
+
+          setPreviewDocs(docs);
+        } catch (err) {
+          console.error("Error al cargar documentos:", err);
+          setPreviewDocs([]);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      console.log("fetchPreview activado con showDetails =", showDetails);
+
       try {
-        let docs = [];
+        const queryConstraints = [];
+        if (selectedCompanyId) {
+          queryConstraints.push(where("companyId", "==", selectedCompanyId));
+        }
+        if (showDetails !== "TodosDocumentos") {
+          queryConstraints.push(where("status", "==", showDetails));
+        }
 
-        const baseQuery = collection(db, "uploadedDocuments");
-        const uploadedSnap = showDetails === "TodosDocumentos"
-          ? await getDocs(baseQuery)
-          : await getDocs(query(
-              baseQuery,
-              ...(selectedCompanyId ? [where("companyId", "==", selectedCompanyId)] : []),
-              where("status", "==", showDetails)
-            ));
-
+        const uploadedSnap = await getDocs(query(collection(db, "uploadedDocuments"), ...queryConstraints));
+        
         const hoy = new Date();
-
-        const docsFiltrados = await Promise.all(uploadedSnap.docs.map(async docSnap => {
+        
+        const docs = await Promise.all(uploadedSnap.docs.map(async docSnap => {
           const data = docSnap.data();
-
-          if (selectedCompanyId && data.companyId !== selectedCompanyId) return null;
-
+          
           const exp = parseFirestoreDate(data.expirationDate);
           const diasRestantes = exp ? Math.ceil((exp - hoy) / (1000 * 60 * 60 * 24)) : null;
-
+          
           let requiredName = "";
           if (data.requiredDocumentId) {
             const ref = doc(db, "requiredDocuments", data.requiredDocumentId);
             const snap = await getDoc(ref);
             if (snap.exists()) requiredName = snap.data().name;
           }
-
+          
           return {
             id: docSnap.id,
-            name: requiredName || data.fileName || "Sin nombre",
+            companyId: data.companyId,
+            companyName: companies.find(c => c.id === data.companyId)?.name || "Sin nombre",
+            category: requiredName || "Sin categoría",
+            name: data.fileName || "Sin nombre",
             expirationDate: exp,
             diasRestantes,
             status: data.status || "Sin estado",
           };
         }));
-
-        docs = docsFiltrados
-        .filter(Boolean)
-        .sort((a, b) => {
-          // 1. Vencidos primero
+        
+        setPreviewDocs(docs.sort((a, b) => {
           if (a.diasRestantes !== null && b.diasRestantes !== null) {
             return a.diasRestantes - b.diasRestantes;
           }
-      
-          // 2. Si uno no tiene fecha, lo manda al final
           if (a.diasRestantes === null && b.diasRestantes !== null) return 1;
           if (a.diasRestantes !== null && b.diasRestantes === null) return -1;
-      
-          // 3. Ambos sin fecha
           return 0;
-        });
-              setPreviewDocs(docs);
+        }));
       } catch (err) {
-        console.error("Error al cargar documentos preview:", err);
+        console.error("Error al cargar documentos:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPreview();
-  }, [showDetails, selectedCompanyId]);
+    const timer = setTimeout(() => {
+      fetchPreview();
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [showDetails, selectedCompanyId, companies]);
 
   const getDeadlineColor = diasRestantes => {
     if (diasRestantes == null) return 'text.primary';
@@ -140,7 +230,7 @@ export default function AdminDashboard() {
     return 'text.primary';
   };
 
-  const StatCard = ({ title, value, icon, color, filterKey }) => (
+  const StatCard = ({ title, value, icon, color, filterKey, onViewAll, tooltip }) => (
     <Grid item xs={12} sm={4} md={4}>
       <Card elevation={1} sx={{ height: "100%", p: 1 }}>
         <CardContent sx={{ p: 1.2 }}>
@@ -149,11 +239,28 @@ export default function AdminDashboard() {
               <Box sx={{ color, display: "flex" }}>{icon}</Box>
             </Tooltip>
             <Typography variant="subtitle2" fontWeight={600} fontSize={13}>{title}</Typography>
+            {tooltip && (
+              <Tooltip title={tooltip} arrow>
+                <Box sx={{ color: 'text.primary', display: "flex", ml: 1 }}>
+                  <WarningAmberIcon fontSize="small" />
+                </Box>
+              </Tooltip>
+            )}
           </Box>
           <Divider sx={{ my: 0.5 }} />
           <Typography variant="h5" align="center" fontWeight="bold">{value}</Typography>
           <Box mt={1} display="flex" justifyContent="center" gap={1}>
-            <Button size="small" onClick={() => setShowDetails(filterKey)}>Ver todos</Button>
+            {onViewAll && (
+              <Button size="small" onClick={onViewAll}>Ver</Button>
+            )}
+            {filterKey && (
+              <Button 
+                size="small" 
+                onClick={() => setShowDetails(filterKey)}
+              >
+                Ver
+              </Button>
+            )}
             {filterKey !== "TodosDocumentos" && (
               <Button 
                 size="small" 
@@ -161,7 +268,7 @@ export default function AdminDashboard() {
                   `/admin/uploaded-documents?filter=${encodeURIComponent(filterKey)}${selectedCompanyId ? `&empresa=${selectedCompanyId}` : ''}`
                 )}
               >
-                Ir a resolver
+                Ir a
               </Button>
             )}
           </Box>
@@ -175,20 +282,32 @@ export default function AdminDashboard() {
     return checkboxFilters.conFecha;
   });
   
+  const handleShowAllCompanies = () => {
+    setShowDetails("TodasEmpresas");
+  };
+
   return (
     <Box>
       <Typography variant="h5" gutterBottom fontWeight="bold">Dashboard del Administrador</Typography>
 
       <Grid container spacing={2}>
         <StatCard
-          title="Proximos a vencer"
+          title="Empresas"
+          value={companies.length}
+          icon={<BusinessIcon color="warning" />}
+          color="warning.dark"
+          onViewAll={handleShowAllCompanies}
+          tooltip="Lista completa de empresas registradas"
+        />
+        <StatCard
+          title="Próximos a vencer"
           value={stats.totalDocumentos}
-          icon={<UploadPendingIcon />}
-          color="info.main"
+          icon={<ErrorIcon color="warning" />}
+          color="error.light"
           filterKey="TodosDocumentos"
         />
         <StatCard
-          title="Pendientes de Aprobación"
+          title="Pendientes de aprobación"
           value={stats.approvalPending}
           icon={<PendingIcon />}
           color="warning.main"
@@ -205,11 +324,7 @@ export default function AdminDashboard() {
 
       {showDetails && (
         <Box mt={4}>
-          <Typography variant="h6" mb={2}>
-            {selectedCompanyId
-              ? `${selectedCompanyName} - Documentos...`
-              : "Todos los documentos - ..."}
-          </Typography>
+          
 
           {loading ? (
             <Typography>Cargando...</Typography>
@@ -217,58 +332,157 @@ export default function AdminDashboard() {
             <Typography>No hay documentos para mostrar.</Typography>
           ) : (
             <Box sx={{ maxWidth: 600 }}>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-  <FormControlLabel
-    control={
-      <Checkbox
-        checked={checkboxFilters.vencidos}
-        onChange={(e) =>
-          setCheckboxFilters(prev => ({ ...prev, vencidos: e.target.checked }))
-        }
-      />
-    }
-    label="Vencidos"
-  />
-  <FormControlLabel
-    control={
-      <Checkbox
-        checked={checkboxFilters.conFecha}
-        onChange={(e) =>
-          setCheckboxFilters(prev => ({ ...prev, conFecha: e.target.checked }))
-        }
-      />
-    }
-    label="Con fecha"
-  />
-  <FormControlLabel
-    control={
-      <Checkbox
-        checked={checkboxFilters.sinFecha}
-        onChange={(e) =>
-          setCheckboxFilters(prev => ({ ...prev, sinFecha: e.target.checked }))
-        }
-      />
-    }
-    label="Sin fecha"
-  />
-</Box>
+              {showDetails === "TodasEmpresas" ? (
+                <Paper variant="outlined" sx={{ mt: 2 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Empresa</TableCell>
+                        <TableCell align="center">Aprobados</TableCell>
+                        <TableCell align="center">Vencidos</TableCell>
+                        <TableCell align="center">Rechazados</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {companies.map(company => {
+                        const docsEmpresa = previewDocs.filter(doc => doc.companyId === company.id);
+                        const isExpanded = expandedRow === company.id;
 
-              <Paper variant="outlined">
+                        const aprobados = docsEmpresa.filter(d => d.status === "Aprobado").length;
+                        const vencidos = docsEmpresa.filter(d => d.diasRestantes !== null && d.diasRestantes <= 0).length;
+                        const rechazados = docsEmpresa.filter(d => d.status === "Rechazado").length;
+
+                        return (
+                          <React.Fragment key={company.id}>
+                            <TableRow hover>
+                              <TableCell>{company.name}</TableCell>
+                              <TableCell align="center">
+                                <Chip label={aprobados} color={aprobados > 0 ? "success" : "default"} size="small" />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip label={vencidos} color={vencidos > 0 ? "error" : "default"} size="small" />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip label={rechazados} color={rechazados > 0 ? "error" : "default"} size="small" />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Button 
+                                  size="small" 
+                                  onClick={() => setExpandedRow(isExpanded ? null : company.id)}
+                                >
+                                  {isExpanded ? 'Ocultar' : 'Ver docs'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+
+                            {isExpanded && (
+                              <TableRow>
+                                <TableCell colSpan={5} sx={{ padding: 0, backgroundColor: '#f9f9f9' }}>
+                                  <Box sx={{ margin: 1 }}>
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Documento</TableCell>
+                                          <TableCell>Estado</TableCell>
+                                          <TableCell>Vencimiento</TableCell>
+                                          <TableCell>Días restantes</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {docsEmpresa.map(doc => (
+                                          <TableRow key={doc.id}>
+                                            <TableCell>{doc.name || 'Sin nombre'}</TableCell>
+                                            <TableCell>
+                                              <Chip 
+                                                label={doc.status} 
+                                                color={
+                                                  doc.status === 'Aprobado' ? 'success' :
+                                                  doc.status === 'Rechazado' ? 'error' : 'warning'
+                                                }
+                                                size="small"
+                                              />
+                                            </TableCell>
+                                            <TableCell>
+                                              {doc.expirationDate?.toLocaleDateString() || 'Sin fecha'}
+                                            </TableCell>
+                                            <TableCell>
+                                              {doc.diasRestantes !== null ? 
+                                                (doc.diasRestantes <= 0 ? 
+                                                  `Vencido (${Math.abs(doc.diasRestantes)} días)` : 
+                                                  doc.diasRestantes) : 
+                                                'N/A'}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </Box>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              ) : (
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={checkboxFilters.vencidos}
+                        onChange={(e) =>
+                          setCheckboxFilters(prev => ({ ...prev, vencidos: e.target.checked }))
+                        }
+                      />
+                    }
+                    label="Vencidos"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={checkboxFilters.conFecha}
+                        onChange={(e) =>
+                          setCheckboxFilters(prev => ({ ...prev, conFecha: e.target.checked }))
+                        }
+                      />
+                    }
+                    label="Con fecha"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={checkboxFilters.sinFecha}
+                        onChange={(e) =>
+                          setCheckboxFilters(prev => ({ ...prev, sinFecha: e.target.checked }))
+                        }
+                      />
+                    }
+                    label="Sin fecha"
+                  />
+                </Box>
+              )}
+              <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
                 <Box sx={{ display: 'flex', fontWeight: 'bold', p: 1, bgcolor: '#f5f5f5' }}>
+                  <Box sx={{ flex: 2 }}>Empresa</Box>
+                  <Box sx={{ flex: 2 }}>categoria</Box>
                   <Box sx={{ flex: 2 }}>Documento</Box>
                   <Box sx={{ flex: 1 }}>Vencimiento</Box>
                 </Box>
                 {visibleDocs.map(doc => (
-  <Box key={doc.id} sx={{ display: 'flex', p: 1, borderTop: '1px solid #eee' }}>
-    <Box sx={{ flex: 2 }}>{doc.name}</Box>
-    <Box sx={{ flex: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography sx={{ color: getDeadlineColor(doc.diasRestantes) }}>
-          {doc.expirationDate instanceof Date && !isNaN(doc.expirationDate)
-            ? doc.expirationDate.toLocaleDateString()
-            : 'Sin fecha'}
-        </Typography>
-        {doc.diasRestantes < 0 && (
+                  <Box key={doc.id} sx={{ display: 'flex', p: 1, borderTop: '1px solid #eee' }}>
+                    <Box sx={{ flex: 2 }}>{doc.companyName}</Box>
+                    <Box sx={{ flex: 2 }}>{doc.category}</Box>
+                    <Box sx={{ flex: 2 }}>{doc.name}</Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography sx={{ color: getDeadlineColor(doc.diasRestantes) }}>
+                          {doc.expirationDate instanceof Date && !isNaN(doc.expirationDate)
+                            ? doc.expirationDate.toLocaleDateString()
+                            : 'Sin fecha'}
+                        </Typography>
+                        {doc.diasRestantes < 0 && (
           <Tooltip title="Documento vencido">
             <WarningAmberIcon color="error" fontSize="small" />
           </Tooltip>

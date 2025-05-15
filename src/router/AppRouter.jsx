@@ -12,6 +12,7 @@ import AdminRequiredDocumentsPage from "../component/administrador/AdminRequired
 import AdminUploadedDocumentsPage from "../component/administrador/AdminUploadedDocumentsPage";
 import DocumentLibraryPage from "../component/administrador/DocumentLibraryPage";
 import AdminAcceptCompanyPage from "../component/administrador/AdminAcceptCompanyPage";
+import AdminStore from "../component/administrador/AdminStore";
 import UsuarioDashboard from "../component/usuario/UsuarioDashboard";
 
 const AppRouter = () => {
@@ -41,6 +42,7 @@ const AppRouter = () => {
             <Route path="required-documents" element={<AdminRequiredDocumentsPage />} />
             <Route path="uploaded-documents" element={<AdminUploadedDocumentsPage />} />
             <Route path="document-library" element={<DocumentLibraryPage />} />
+            <Route path="store" element={<AdminStore />} />
           </Route>
 
           {/* Rutas protegidas para usuarios */}
