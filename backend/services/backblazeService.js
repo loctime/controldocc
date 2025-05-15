@@ -15,13 +15,18 @@ export async function initB2() {
   return authData;
 }
 
-export async function uploadFile(fileBuffer, mimeType, sha1 = 'do_not_verify') {
+export async function uploadFile(fileBuffer, mimeType, options = {}) {
   try {
     if (!authData) await initB2();
 
     const extension = guessExtension(mimeType);
     const randomName = generateSafeFileName(extension);
-    const finalPath = `documentExamples/${randomName}`.replace(/\s/g, '_');
+    const finalPath = `${options.folder || 'documentExamples'}/${randomName}`.replace(/\s/g, '_');
+
+    // Validar y generar SHA1
+    const sha1 = options.sha1 && typeof options.sha1 === 'string' && /^[a-f0-9]{40}$/.test(options.sha1)
+      ? options.sha1
+      : crypto.createHash('sha1').update(fileBuffer).digest('hex');
 
     const uploadUrlResp = await axios.post(
       `${authData.apiUrl}/b2api/v2/b2_get_upload_url`,
@@ -29,29 +34,23 @@ export async function uploadFile(fileBuffer, mimeType, sha1 = 'do_not_verify') {
       { headers: { Authorization: authData.authorizationToken } }
     );
 
-    const { uploadUrl, authorizationToken } = uploadUrlResp.data;
+    const headers = {
+      Authorization: uploadUrlResp.data.authorizationToken,
+      'X-Bz-File-Name': finalPath,
+      'Content-Type': mimeType,
+      'X-Bz-Content-Sha1': sha1,
+      'X-Bz-Info-original_filename': options.originalFilename || randomName
+    };
 
-    if (DEBUG_MODE) {
-      console.log('DEBUG upload:', {
-        uploadUrl,
-        'X-Bz-File-Name': finalPath,
-        mimeType
-      });
+    if (options.customMetadata) {
+      headers['X-Bz-Info-metadata'] = JSON.stringify(options.customMetadata);
     }
 
     const response = await axios({
       method: 'post',
-      url: uploadUrl,
-      headers: {
-        Authorization: authorizationToken,
-        'X-Bz-File-Name': finalPath,
-        'Content-Type': mimeType,
-        'X-Bz-Content-Sha1': sha1,
-      },
-      data: fileBuffer,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      transformRequest: [(data) => data],
+      url: uploadUrlResp.data.uploadUrl,
+      headers,
+      data: fileBuffer
     });
 
     const bucketName = process.env.B2_BUCKET_NAME || 'controldocc';
@@ -63,17 +62,9 @@ export async function uploadFile(fileBuffer, mimeType, sha1 = 'do_not_verify') {
       fileName: randomName,
     };
   } catch (error) {
-    DEBUG_MODE && console.error('Error uploading file:', {
-      message: error.message,
-      code: error.code,
-      response: error.response?.data,
-      stack: error.stack
-    });
-
-    if (error.response?.data) {
-      throw new Error(`Backblaze error: ${error.response.data.code} - ${error.response.data.message}`);
-    }
-    throw error;
+    const errorDetails = error.response?.data || error.message;
+    console.error('[Backblaze] Error:', errorDetails);
+    throw new Error(`Backblaze error: ${error.response?.data?.message || error.message}`);
   }
 }
 

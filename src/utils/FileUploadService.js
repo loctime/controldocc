@@ -1,6 +1,12 @@
 // src/utils/FileUploadService.js
 import { getAuth } from "firebase/auth";
 
+const calculateSHA1 = async (file) => {
+  const buffer = await file.arrayBuffer();
+  const hashArray = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', buffer)));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 export const uploadFile = async (file, folder, options = {}) => {
   try {
     const auth = getAuth();
@@ -10,6 +16,7 @@ export const uploadFile = async (file, folder, options = {}) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
+    formData.append("sha1", await calculateSHA1(file));
 
     // Limpiar metadatos para evitar undefineds
     if (options.metadata) {
