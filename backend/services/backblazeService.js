@@ -23,10 +23,8 @@ export async function uploadFile(fileBuffer, mimeType, options = {}) {
     const randomName = generateSafeFileName(extension);
     const finalPath = `${options.folder || 'documentExamples'}/${randomName}`.replace(/\s/g, '_');
 
-    // Validar y generar SHA1
-    const sha1 = options.sha1 && typeof options.sha1 === 'string' && /^[a-f0-9]{40}$/.test(options.sha1)
-      ? options.sha1
-      : crypto.createHash('sha1').update(fileBuffer).digest('hex');
+    // Generar SHA1 del buffer
+    const sha1 = crypto.createHash('sha1').update(fileBuffer).digest('hex');
 
     const uploadUrlResp = await axios.post(
       `${authData.apiUrl}/b2api/v2/b2_get_upload_url`,
@@ -34,36 +32,25 @@ export async function uploadFile(fileBuffer, mimeType, options = {}) {
       { headers: { Authorization: authData.authorizationToken } }
     );
 
-    const headers = {
-      Authorization: uploadUrlResp.data.authorizationToken,
-      'X-Bz-File-Name': finalPath,
-      'Content-Type': mimeType,
-      'X-Bz-Content-Sha1': sha1,
-      'X-Bz-Info-original_filename': options.originalFilename || randomName
-    };
-
-    if (options.customMetadata) {
-      headers['X-Bz-Info-metadata'] = JSON.stringify(options.customMetadata);
-    }
-
     const response = await axios({
       method: 'post',
       url: uploadUrlResp.data.uploadUrl,
-      headers,
+      headers: {
+        Authorization: uploadUrlResp.data.authorizationToken,
+        'X-Bz-File-Name': finalPath,
+        'Content-Type': mimeType,
+        'X-Bz-Content-Sha1': sha1
+      },
       data: fileBuffer
     });
 
-    const bucketName = process.env.B2_BUCKET_NAME || 'controldocc';
-    const downloadUrl = `https://${authData.downloadUrl.split('/')[2]}/file/${bucketName}/${finalPath}`;
-
     return {
-      url: downloadUrl,
+      url: `https://${authData.downloadUrl.split('/')[2]}/file/${process.env.B2_BUCKET_NAME}/${finalPath}`,
       fileId: response.data.fileId,
-      fileName: randomName,
+      fileName: randomName
     };
   } catch (error) {
-    const errorDetails = error.response?.data || error.message;
-    console.error('[Backblaze] Error:', errorDetails);
+    console.error('[Backblaze] Error:', error.response?.data || error.message);
     throw new Error(`Backblaze error: ${error.response?.data?.message || error.message}`);
   }
 }

@@ -31,14 +31,7 @@ export default (upload) => {
           req.file.buffer,
           req.file.mimetype,
           {
-            folder,
-            sha1: req.body.sha1,
-            originalFilename: req.file.originalname,
-            customMetadata: {
-              uploader: req.user.email,
-              companyId: req.user.companyId,
-              ...metadata
-            }
+            folder
           }
         );
 
