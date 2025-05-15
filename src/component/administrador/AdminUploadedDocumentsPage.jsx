@@ -12,7 +12,7 @@ import handleApproveOrReject from './handleApproveOrReject';
 import RevisionDocumentoDialog from './RevisionDocumentoDialog';
 import VistaDocumentoSubido from './VistaDocumentoSubido';
 import { useSearchParams } from 'react-router-dom';
-
+import DownloadButton from '../../components/common/DownloadButton';
 import { useNavigate } from 'react-router-dom';
 import { useRef } from 'react';
 export default function AdminUploadedDocumentsPage() {
@@ -184,38 +184,6 @@ useEffect(() => {
 const handleExpandRow = (id) => {
     setExpandedRow(prev => (prev === id ? null : id));
   };
-
-          const handleDownload = async (url, filename) => {
-    if (!url) {
-      setToastMessage('No se encontró el archivo para descargar.');
-      setToastOpen(true);
-      return;
-    }
-  
-    try {
-      const response = await fetch(url, { mode: 'cors' });
-      if (!response.ok) throw new Error('No se pudo descargar el archivo');
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-  
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename || 'documento';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-  
-      setToastMessage('Descarga iniciada ');
-      setToastOpen(true);
-    } catch (error) {
-      console.error('Error al descargar archivo:', error);
-      setToastMessage('Error al descargar el archivo.');
-      setToastOpen(true);
-    }
-  };
-
 
           const handleViewFile = (url, filename) => {
     setViewFileUrl(url);
@@ -452,9 +420,8 @@ const handleExpandRow = (id) => {
   fileURL={doc.fileURL}
   fileName={doc.fileName}
   uploaderName={doc.uploadedBy}
-  uploaderComment={doc.comment} // ✅ CORREGIDO
+  uploaderComment={doc.comment} 
   exampleURL={doc.requiredDocument?.exampleImage}
-  onDownload={() => handleDownload(doc.fileURL, doc.fileName)}
 />
 
     {!dialogAccion && (
@@ -501,7 +468,13 @@ const handleExpandRow = (id) => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog} color="secondary">Cerrar</Button>
-            <Button onClick={() => handleDownload(viewFileUrl, viewFileName)} startIcon={<Download />}>Descargar</Button>
+            <DownloadButton
+              url={viewFileUrl}
+              filename={viewFileName}
+              label="Descargar"
+              startIcon
+              variant="outlined"
+            />
           </DialogActions>
         </Dialog>
 
@@ -517,7 +490,7 @@ const handleExpandRow = (id) => {
           tipo={dialogAccion?.tipo}
           doc={dialogAccion?.doc}
           onClose={() => setDialogAccion(null)}
-          onDownload={handleDownload}
+          onDownload={handleViewFile}
           onViewFile={handleViewFile}
           expirationDate={newExpirationDates[dialogAccion?.doc?.id] || ''}
           setExpirationDate={(val) =>

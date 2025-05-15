@@ -6,13 +6,13 @@ import {
   Box, Typography, TextField, Button
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
+import DownloadButton from '../../components/common/DownloadButton';
 
 export default function RevisionDocumentoDialog({
   open,
   tipo, // 'aprobar' o 'rechazar'
   doc,
   onClose,
-  onDownload,
   onViewFile,
   onConfirm,
   expirationDate,
@@ -43,14 +43,14 @@ export default function RevisionDocumentoDialog({
               )}
             </Box>
 
-            <Button
+            <DownloadButton
+              url={doc.fileURL}
+              filename={doc.fileName}
+              label="Descargar archivo"
+              startIcon
               variant="outlined"
-              startIcon={<Download />}
-              onClick={() => onDownload(doc.fileURL, doc.fileName)}
               sx={{ mb: 2 }}
-            >
-              Descargar archivo
-            </Button>
+            />
 
             <TextField
               label="Fecha de vencimiento"

@@ -89,6 +89,7 @@ const AdminAcceptCompanyPage = () => {
   };
 
   const columns = [
+    { id: 'companyName', label: 'Nombre Empresa' },
     { id: 'email', label: 'Email' },
     { id: 'cuit', label: 'CUIT' },
     { id: 'createdAt', label: 'Fecha Registro' }
@@ -116,6 +117,7 @@ const AdminAcceptCompanyPage = () => {
           <TableBody>
             {companies.map((company) => (
               <TableRow key={company.id}>
+                <TableCell>{company.companyName}</TableCell>
                 <TableCell>{company.email}</TableCell>
                 <TableCell>{company.cuit}</TableCell>
                 <TableCell>

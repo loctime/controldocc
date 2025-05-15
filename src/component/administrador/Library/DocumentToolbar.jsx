@@ -3,11 +3,13 @@ import {
   Box, Typography, Button, IconButton, Breadcrumbs,
   Paper, Alert, CircularProgress
 } from '@mui/material';
-import {
+import { 
   Download, GridView, ViewList, Sort, 
   FilterList, Folder
 } from '@mui/icons-material';
 import { Link as MuiLink } from '@mui/material';
+import DownloadButton from '../../../components/common/DownloadButton';
+import MultiDownloadZipButton from '../../../components/common/MultiDownloadZipButton';
 
 export default function DocumentToolbar({
   title,
@@ -104,15 +106,34 @@ export default function DocumentToolbar({
             {selectedFiles.length} {selectedFiles.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
           </Typography>
           
-          <Button
-            variant="contained"
-            startIcon={<Download />}
-            size="small"
-            sx={{ borderRadius: 2 }}
-            onClick={downloadSelectedFiles}
-          >
-            Descargar
-          </Button>
+          {selectedFiles.length === 1 ? (
+            <DownloadButton
+              url={documents.find(doc => doc.id === selectedFiles[0])?.urlB2}
+              filename={documents.find(doc => doc.id === selectedFiles[0])?.nombreOriginal}
+              label="Descargar"
+              disabled={false}
+              variant="contained"
+              size="small"
+              sx={{ borderRadius: 2 }}
+              onClick={downloadSelectedFiles}
+            />
+          ) : (
+            <MultiDownloadZipButton
+              files={selectedFiles.map(fileId => {
+                const doc = documents.find(d => d.id === fileId);
+                return {
+                  url: doc?.urlB2,
+                  filename: doc?.nombreOriginal
+                };
+              }).filter(f => f.url)}
+              label={`Descargar ${selectedFiles.length} archivos`}
+              disabled={selectedFiles.length === 0}
+              variant="contained"
+              size="small"
+              sx={{ borderRadius: 2 }}
+              zipName={`documentos_${new Date().toISOString().slice(0,10)}.zip`}
+            />
+          )}
         </Paper>
       )}
 

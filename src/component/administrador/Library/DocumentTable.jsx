@@ -1,9 +1,12 @@
 import React, { useMemo } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, IconButton, Tooltip, Checkbox, Chip, TableSortLabel, Box, Typography
+  Paper, Tooltip, Checkbox, Chip, TableSortLabel, Box, Typography, IconButton
 } from '@mui/material';
-import { Download, Visibility } from '@mui/icons-material';
+import { Visibility } from '@mui/icons-material';
+
+import DownloadButton from '../../../components/common/DownloadButton';
+
 
 const DocumentTable = ({
   documents,
@@ -162,13 +165,13 @@ const DocumentTable = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Descargar">
-                    <IconButton
-                      onClick={() => handleDownload(doc.urlB2, doc.nombreOriginal)}
+                    <DownloadButton 
+                      url={doc.urlB2}
+                      filename={doc.nombreOriginal}
                       size="small"
+                      iconOnly
                       disabled={!doc.urlB2}
-                    >
-                      <Download fontSize="small" />
-                    </IconButton>
+                    />
                   </Tooltip>
                 </TableCell>
               </TableRow>

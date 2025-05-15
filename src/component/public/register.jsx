@@ -1,9 +1,13 @@
-// g:\controldoc-master99\src\component\public\RegisterCompanyPage.jsx
 import React, { useState } from 'react';
+import {
+  Button, TextField, Box, CircularProgress, Alert,
+  Typography, Paper, Container, Avatar, Grid, Link
+} from "@mui/material";
+import { Business as BusinessIcon } from "@mui/icons-material";
 import { auth, db } from '../../firebaseconfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { serverTimestamp } from 'firebase/firestore';
 
 const Register = () => {
@@ -14,11 +18,13 @@ const Register = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     
     try {
       // 1. Validaciones paralelas
@@ -59,68 +65,99 @@ const Register = () => {
       ]);
 
       // 4. Feedback
-      alert('Registro exitoso\nSu empresa está pendiente de aprobación');
-      navigate('/login');
+      navigate('/login', { state: { registrationSuccess: true } });
 
     } catch (error) {
-      alert(error.message);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="register-container">
-      <h2>Registro de Empresa</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Email:</label>
-          <input 
-            type="email" 
+    <Container component="main" maxWidth="xs">
+      <Paper elevation={3} sx={{
+        p: 4,
+        mt: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}>
+        <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
+          <BusinessIcon />
+        </Avatar>
+        <Typography component="h1" variant="h5">
+          Registro de Empresa
+        </Typography>
+
+        {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
+
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+          <TextField
+            label="Email"
+            margin="normal"
+            fullWidth
+            type="email"
             value={formData.email}
             onChange={(e) => setFormData({...formData, email: e.target.value})}
             required
           />
-        </div>
-        
-        <div className="form-group">
-          <label>CUIT:</label>
-          <input
-            type="text"
+          
+          <TextField
+            label="CUIT"
+            margin="normal"
+            fullWidth
             value={formData.cuit}
             onChange={(e) => setFormData({...formData, cuit: e.target.value})}
             required
-            pattern="[0-9]{11}"
-            title="11 dígitos sin guiones"
+            inputProps={{
+              pattern: "[0-9]{11}",
+              title: "11 dígitos sin guiones"
+            }}
           />
-        </div>
 
-        <div className="form-group">
-          <label>Nombre de la Empresa:</label>
-          <input
-            type="text"
+          <TextField
+            label="Nombre de la Empresa"
+            margin="normal"
+            fullWidth
             value={formData.companyName}
             onChange={(e) => setFormData({...formData, companyName: e.target.value})}
             required
           />
-        </div>
 
-        <div className="form-group">
-          <label>Contraseña:</label>
-          <input
+          <TextField
+            label="Contraseña"
+            margin="normal"
+            fullWidth
             type="password"
             value={formData.password}
             onChange={(e) => setFormData({...formData, password: e.target.value})}
             required
-            minLength="6"
+            inputProps={{
+              minLength: 6
+            }}
           />
-        </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Registrando...' : 'Registrar Empresa'}
-        </button>
-      </form>
-    </div>
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Registrar Empresa'}
+          </Button>
+          
+          <Grid container justifyContent="flex-end">
+            <Grid item>
+              <Link component={RouterLink} to="/login" variant="body2">
+                ¿Ya tienes cuenta? Inicia sesión
+              </Link>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+    </Container>
   );
 };
 

@@ -27,7 +27,8 @@ import DocumentFilters from './Library/DocumentFilters';
 import DocumentSidebar from './Library/DocumentSidebar';
 import DocumentTable from './Library/DocumentTable';
 import EmpresaTable from './Library/EmpresaTable';
-
+import DownloadButton from '../../components/common/DownloadButton';
+import MultiDownloadZipButton from '../../components/common/MultiDownloadZipButton';
 
 // 🔐 Admin role constant
 const ADMIN_ROLE = "DhHkVja";
@@ -245,23 +246,23 @@ const {
     
     setToastMessage(`Preparando ${selectedFiles.length} archivos para descargar...`);
     setToastOpen(true);
-    
-    try {
-      // Si es solo un archivo, usar la función de descarga individual
-      if (selectedFiles.length === 1) {
-        const fileToDownload = documents.find(doc => doc.id === selectedFiles[0]);
-        if (fileToDownload) {
-          handleDownload(fileToDownload.urlB2, fileToDownload.nombreOriginal);
-        }
-        return;
+
+    // Si es solo un archivo, usar DownloadButton directamente
+    if (selectedFiles.length === 1) {
+      const fileToDownload = documents.find(doc => doc.id === selectedFiles[0]);
+      if (fileToDownload) {
+        return <DownloadButton 
+          url={fileToDownload.urlB2}
+          filename={fileToDownload.nombreOriginal}
+          autoTrigger
+        />;
       }
-      
-      // Para múltiples archivos, crear un archivo zip (simulado por ahora)
-      // En una implementación real, usaríamos una biblioteca como JSZip
-      
-      // Simular tiempo de procesamiento
+      return;
+    }
+
+    // Lógica existente para múltiples archivos...
+    try {
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
       setToastMessage(`${selectedFiles.length} archivos descargados correctamente`);
       setToastOpen(true);
       setSelectedFiles([]);
@@ -353,6 +354,14 @@ const {
       default:
         return <InsertDriveFile color="action" />;
     }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '-';
+    if (typeof date === 'string') return new Date(date).toLocaleDateString();
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
+    if (date instanceof Date) return date.toLocaleDateString();
+    return '-';
   };
 
   const handleSearch = async () => {
@@ -511,30 +520,6 @@ const {
     setViewFileUrl('');
     setViewFileName('');
     setOpenDialog(false);
-  };
-
-  const handleDownload = (url, filename) => {
-    if (!url || !filename) return;
-  
-    const safeFilename = filename.replace(/[^\w\d.-]/g, '_');
-  
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', safeFilename); // ✅ Forzar descarga
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-  
-
-
-  const formatDate = (date) => {
-    if (!date) return '-';
-    if (typeof date === 'string') return new Date(date).toLocaleDateString();
-    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
-    if (date instanceof Date) return date.toLocaleDateString();
-    return '-';
   };
 
   const logAuditEvent = async (action, documentId = null) => {
@@ -712,19 +697,43 @@ const {
                 {selectedFiles.length} {selectedFiles.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<Download />}
-                  size="small"
-                  sx={{ borderRadius: 2 }}
-                  onClick={() => {
-                    setToastMessage(`Descargando ${selectedFiles.length} archivos`);
-                    setToastOpen(true);
-                  }}
-                >
-                  Descargar
-                </Button>
-                
+                {selectedFiles.length === 1 ? (
+                  <DownloadButton
+                    url={documents.find(doc => doc.id === selectedFiles[0])?.urlB2}
+                    filename={documents.find(doc => doc.id === selectedFiles[0])?.nombreOriginal}
+                    label="Descargar"
+                    disabled={false}
+                    onClick={() => {
+                      setToastMessage(`Preparando archivo para descargar...`);
+                      setToastOpen(true);
+                    }}
+                  />
+                ) : (
+                  <MultiDownloadZipButton
+                    files={selectedFiles.map(fileId => {
+                      const doc = documents.find(d => d.id === fileId);
+                      return doc ? { 
+                        url: doc.urlB2, 
+                        filename: doc.nombreOriginal 
+                      } : null;
+                    }).filter(Boolean)}
+                    label={`Descargar ${selectedFiles.length} archivos`}
+                    disabled={selectedFiles.length === 0}
+                    onStart={() => {
+                      setToastMessage(`Preparando ${selectedFiles.length} archivos para descargar...`);
+                      setToastOpen(true);
+                    }}
+                    onComplete={() => {
+                      setToastMessage(`Descarga completada`);
+                      setToastOpen(true);
+                    }}
+                    onError={(error) => {
+                      setToastMessage(`Error al descargar: ${error}`);
+                      setToastOpen(true);
+                    }}
+                    zipName={`documentos_${new Date().toISOString().slice(0,10)}.zip`}
+                  />
+                )}
               </Box>
             </Paper>
           )}
@@ -754,7 +763,14 @@ const {
     toggleFileSelection={toggleFileSelection}
     selectAllFiles={selectAllFiles}
     onViewDetails={showFileDetails}
-    handleDownload={handleDownload}
+    handleDownload={(url, filename) => (
+      <DownloadButton 
+        url={url}
+        filename={filename}
+        size="small"
+        iconOnly
+      />
+    )}
     formatFileSize={formatFileSize}
     formatDate={formatDate}
     getFileIcon={getFileIcon}
@@ -830,9 +846,12 @@ const {
                                 <IconButton size="small" onClick={() => handleViewFile(doc.urlB2, doc.nombreOriginal)}>
                                   <Visibility />
                                 </IconButton>
-                                <IconButton size="small" onClick={() => handleDownload(doc.urlB2, doc.nombreOriginal)}>
-                                  <Download />
-                                </IconButton>
+                                <DownloadButton 
+                                  url={doc.urlB2}
+                                  filename={doc.nombreOriginal}
+                                  size="small"
+                                  iconOnly
+                                />
                                 <IconButton size="small" onClick={() => showFileDetails(doc.id)}>
                                   <Info />
                                 </IconButton>
@@ -894,7 +913,14 @@ const {
           <ListItemText>Ver documento</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => {
-          if (contextMenu) handleDownload('', documents.find(d => d.id === contextMenu.fileId)?.nombreOriginal || '');
+          if (contextMenu) {
+            const file = documents.find(d => d.id === contextMenu.fileId);
+            return file && <DownloadButton 
+              url={file.urlB2}
+              filename={file.nombreOriginal}
+              autoTrigger
+            />;
+          }
           handleCloseContextMenu();
         }}>
           <ListItemIcon>
@@ -1043,12 +1069,12 @@ const {
               </Grid>
             </DialogContent>
             <DialogActions>
-              <Button 
-                startIcon={<Download />}
-                onClick={() => handleDownload(selectedFileDetails.urlB2, selectedFileDetails.nombreOriginal)}
-              >
-                Descargar
-              </Button>
+              <DownloadButton 
+                url={selectedFileDetails.urlB2}
+                filename={selectedFileDetails.nombreOriginal}
+                startIcon
+                label="Descargar"
+              />
               <Button 
                 startIcon={<Visibility />}
                 onClick={() => {
