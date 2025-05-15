@@ -166,13 +166,13 @@ export default function AdminLayout() {
               renderValue={(selected) => {
                 if (!selected || selected === 'todas') return 'Todas las empresas';
                 const company = companies.find(c => String(c.id) === selected);
-                return company?.name || 'Empresa seleccionada';
+                return company?.companyName || company?.name || 'Empresa seleccionada';
               }}
             >
               <MenuItem value="todas"><em>Todas las empresas</em></MenuItem>
               {companies.map((company) => (
                 <MenuItem key={company.id} value={String(company.id)}>
-                  {company.name}
+                  {company.companyName || company.name}
                 </MenuItem>
               ))}
             </Select>

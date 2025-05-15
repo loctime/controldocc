@@ -62,13 +62,13 @@ const AdminAcceptCompanyPage = () => {
       // 2. Actualizar usuario
       await setDoc(doc(db, "users", company.ownerId), {
         companyId: company.cuit,
-        companyName: company.companyName,
+        companyName: company.companyName || company.name,
         companyStatus: "approved",
         hasCompany: true
       }, { merge: true });
 
       // 3. Feedback
-      enqueueSnackbar(`Empresa ${company.companyName} aprobada`, {
+      enqueueSnackbar(`Empresa ${company.companyName || company.name} aprobada`, {
         variant: 'success',
         autoHideDuration: 3000,
         anchorOrigin: { vertical: 'top', horizontal: 'center' }
