@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCompanies } from "../../context/CompaniesContext";
 import { auth } from "../../firebaseconfig";
@@ -7,6 +7,12 @@ import { styled, useTheme } from "@mui/material/styles";
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ApprovalIcon from '@mui/icons-material/Approval';
 import StorageIcon from '@mui/icons-material/Storage';
+import AlertCenter from './dashboard/AlertCenter';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
 
 import {
   Box,
@@ -29,7 +35,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  CircularProgress
+  CircularProgress,
+  Badge
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -44,6 +51,8 @@ import {
   Person as PersonIcon,
   Logout as LogoutIcon,
 } from "@mui/icons-material";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../firebaseconfig";
 
 const drawerWidth = 180;
 
@@ -101,8 +110,86 @@ export default function AdminLayout() {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState(null);
+  const [expandedNotifications, setExpandedNotifications] = useState(false);
 
   const { companies, selectedCompany, selectCompany, loading: loadingCompanies } = useCompanies();
+
+  const [alerts, setAlerts] = useState([]);
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        // Documentos pendientes
+        const pendingQuery = query(
+          collection(db, "uploadedDocuments"),
+          where("status", "==", "Pendiente de revisión")
+        );
+        const pendingSnap = await getDocs(pendingQuery);
+        
+        // Documentos vencidos - consulta corregida
+        const expiredQuery = query(
+          collection(db, "uploadedDocuments"),
+          where("status", "==", "Aprobado"),
+          where("expirationDate", "<", new Date())
+        );
+        const expiredSnap = await getDocs(expiredQuery);
+
+        const newAlerts = [];
+        
+        if (!pendingSnap.empty) {
+          newAlerts.push({
+            id: 1,
+            icon: <WarningIcon color="warning" />,
+            text: `${pendingSnap.size} documentos pendientes`,
+            relatedDocuments: pendingSnap.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                name: data.documentName || data.fileName || "Documento sin nombre",
+                company: companies.find(c => c.id === data.companyId)?.name || "Sin empresa",
+                expirationDate: data.expirationDate,
+                status: "Pendiente"
+              };
+            })
+          });
+        }
+
+        if (!expiredSnap.empty) {
+          newAlerts.push({
+            id: 2,
+            icon: <ErrorIcon color="error" />,
+            text: `${expiredSnap.size} documentos vencidos`,
+            relatedDocuments: expiredSnap.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                name: data.documentName || data.fileName || "Documento sin nombre",
+                company: companies.find(c => c.id === data.companyId)?.name || "Sin empresa",
+                expirationDate: data.expirationDate,
+                status: "Vencido"
+              };
+            })
+          });
+        }
+
+        setAlerts(newAlerts.length > 0 ? newAlerts : [{
+          id: 0,
+          icon: <InfoIcon color="info" />,
+          text: "No hay notificaciones",
+          relatedDocuments: []
+        }]);
+      } catch (error) {
+        console.error("Error cargando alertas:", error);
+        setAlerts([{
+          id: 0,
+          icon: <ErrorIcon color="error" />,
+          text: "Error cargando notificaciones",
+          relatedDocuments: []
+        }]);
+      }
+    };
+
+    fetchAlerts();
+  }, [companies]);
 
   const handleDrawerOpen = () => setOpen(true);
   const handleDrawerClose = () => setOpen(false);
@@ -183,14 +270,63 @@ export default function AdminLayout() {
           {/* Notificaciones */}
           <Tooltip title="Notificaciones">
             <IconButton color="inherit" onClick={handleNotificationsOpen} sx={{ mr: 1 }}>
-              <NotificationsIcon />
+              <Badge badgeContent={alerts.length} color="error">
+                <NotificationsIcon />
+              </Badge>
             </IconButton>
           </Tooltip>
 
-          <Menu anchorEl={notificationsAnchorEl} open={Boolean(notificationsAnchorEl)} onClose={handleNotificationsClose}>
-            <MenuItem>
-              <Typography variant="body2">No hay notificaciones nuevas</Typography>
-            </MenuItem>
+          <Menu
+            anchorEl={notificationsAnchorEl}
+            open={Boolean(notificationsAnchorEl)}
+            onClose={handleNotificationsClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            PaperProps={{
+              sx: {
+                width: expandedNotifications ? '90vw' : 400,
+                height: expandedNotifications ? '85vh' : '75vh',
+                maxHeight: expandedNotifications ? 'none' : 'none',
+                mt: 1,
+                p: 0
+              }
+            }}
+          >
+            <Box sx={{ 
+              p: 2, 
+              height: '100%',
+              display: 'flex', 
+              flexDirection: 'column',
+              maxHeight: expandedNotifications ? 'calc(85vh - 48px)' : 'calc(75vh - 48px)'
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 1
+              }}>
+                <Typography variant="h6" fontWeight="bold">Notificaciones</Typography>
+                <IconButton 
+                  size="small"
+                  onClick={() => setExpandedNotifications(!expandedNotifications)}
+                >
+                  {expandedNotifications ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                </IconButton>
+              </Box>
+              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                <AlertCenter 
+                  alerts={alerts} 
+                  setAlerts={setAlerts} 
+                  compact={false}
+                />
+              </Box>
+            </Box>
           </Menu>
 
           {/* Perfil de usuario */}
