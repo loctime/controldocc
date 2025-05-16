@@ -116,80 +116,132 @@ export default function AdminLayout() {
 
   const [alerts, setAlerts] = useState([]);
   useEffect(() => {
+    const buildAlert = ({ id, icon, text, relatedDocuments, level = "warning" }) => ({
+      id,
+      icon,
+      text,
+      relatedDocuments,
+      level,
+      timestamp: Date.now(),
+      isRead: false
+    });
+  
+    const getDate = (firestoreDate) => firestoreDate?.toDate?.() ?? null;
+  
     const fetchAlerts = async () => {
       try {
-        // Documentos pendientes
-        const pendingQuery = query(
-          collection(db, "uploadedDocuments"),
-          where("status", "==", "Pendiente de revisión")
-        );
-        const pendingSnap = await getDocs(pendingQuery);
-        
-        // Documentos vencidos - consulta corregida
-        const expiredQuery = query(
-          collection(db, "uploadedDocuments"),
-          where("status", "==", "Aprobado"),
-          where("expirationDate", "<", new Date())
-        );
-        const expiredSnap = await getDocs(expiredQuery);
-
-        const newAlerts = [];
-        
-        if (!pendingSnap.empty) {
-          newAlerts.push({
-            id: 1,
+        const allDocsSnap = await getDocs(collection(db, "uploadedDocuments"));
+        const docs = allDocsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const hoy = new Date();
+        const cincoDias = new Date();
+        cincoDias.setDate(hoy.getDate() + 5);
+  
+        const alertsList = [];
+  
+        // 1. Pendientes
+        const pendientes = docs.filter(d => d.status === "Pendiente de revisión");
+        if (pendientes.length > 0) {
+          alertsList.push(buildAlert({
+            id: "pendientes",
             icon: <WarningIcon color="warning" />,
-            text: `${pendingSnap.size} documentos pendientes`,
-            relatedDocuments: pendingSnap.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                name: data.documentName || data.fileName || "Documento sin nombre",
-                company: companies.find(c => c.id === data.companyId)?.name || "Sin empresa",
-                expirationDate: data.expirationDate,
-                status: "Pendiente"
-              };
-            })
-          });
+            text: `${pendientes.length} documentos pendientes`,
+            relatedDocuments: pendientes.map(d => ({
+              id: d.id,
+              name: d.fileName || d.documentName || "Sin nombre",
+              company: companies.find(c => c.id === d.companyId)?.name || "Sin empresa",
+              expirationDate: getDate(d.expirationDate),
+              status: "Pendiente"
+            })),
+            level: "warning"
+          }));
         }
-
-        if (!expiredSnap.empty) {
-          newAlerts.push({
-            id: 2,
+  
+        // 2. Vencidos
+        const vencidos = docs.filter(d => d.status === "Aprobado" && getDate(d.expirationDate) < hoy);
+        if (vencidos.length > 0) {
+          alertsList.push(buildAlert({
+            id: "vencidos",
             icon: <ErrorIcon color="error" />,
-            text: `${expiredSnap.size} documentos vencidos`,
-            relatedDocuments: expiredSnap.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                name: data.documentName || data.fileName || "Documento sin nombre",
-                company: companies.find(c => c.id === data.companyId)?.name || "Sin empresa",
-                expirationDate: data.expirationDate,
-                status: "Vencido"
-              };
-            })
-          });
+            text: `${vencidos.length} documentos vencidos`,
+            relatedDocuments: vencidos.map(d => ({
+              id: d.id,
+              name: d.fileName || d.documentName || "Sin nombre",
+              company: companies.find(c => c.id === d.companyId)?.name || "Sin empresa",
+              expirationDate: getDate(d.expirationDate),
+              status: "Vencido"
+            })),
+            level: "error"
+          }));
         }
-
-        setAlerts(newAlerts.length > 0 ? newAlerts : [{
-          id: 0,
-          icon: <InfoIcon color="info" />,
-          text: "No hay notificaciones",
-          relatedDocuments: []
-        }]);
+  
+        // 3. Por vencer (en los próximos 5 días)
+        const porVencer = docs.filter(d => {
+          const fecha = getDate(d.expirationDate);
+          return d.status === "Aprobado" && fecha >= hoy && fecha <= cincoDias;
+        });
+        if (porVencer.length > 0) {
+          alertsList.push(buildAlert({
+            id: "por-vencer",
+            icon: <WarningIcon color="warning" />,
+            text: `${porVencer.length} documentos por vencer`,
+            relatedDocuments: porVencer.map(d => ({
+              id: d.id,
+              name: d.fileName || d.documentName || "Sin nombre",
+              company: companies.find(c => c.id === d.companyId)?.name || "Sin empresa",
+              expirationDate: getDate(d.expirationDate),
+              status: "Por vencer"
+            })),
+            level: "warning"
+          }));
+        }
+  
+        // 4. Sin fecha de vencimiento
+        const sinFecha = docs.filter(d => d.status === "Aprobado" && !d.expirationDate);
+        if (sinFecha.length > 0) {
+          alertsList.push(buildAlert({
+            id: "sin-fecha",
+            icon: <InfoIcon color="info" />,
+            text: `${sinFecha.length} documentos sin fecha de vencimiento`,
+            relatedDocuments: sinFecha.map(d => ({
+              id: d.id,
+              name: d.fileName || d.documentName || "Sin nombre",
+              company: companies.find(c => c.id === d.companyId)?.name || "Sin empresa",
+              expirationDate: null,
+              status: "Aprobado sin fecha"
+            })),
+            level: "info"
+          }));
+        }
+  
+        // Si no hay alertas relevantes
+        if (alertsList.length === 0) {
+          alertsList.push(buildAlert({
+            id: "nada",
+            icon: <InfoIcon color="info" />,
+            text: "No hay notificaciones",
+            relatedDocuments: [],
+            level: "info"
+          }));
+        }
+  
+        setAlerts(alertsList);
       } catch (error) {
-        console.error("Error cargando alertas:", error);
+        console.error("Error al cargar alertas:", error);
         setAlerts([{
-          id: 0,
+          id: "error",
           icon: <ErrorIcon color="error" />,
           text: "Error cargando notificaciones",
-          relatedDocuments: []
+          relatedDocuments: [],
+          level: "error",
+          timestamp: Date.now(),
+          isRead: false
         }]);
       }
     };
-
+  
     fetchAlerts();
   }, [companies]);
+  
 
   const handleDrawerOpen = () => setOpen(true);
   const handleDrawerClose = () => setOpen(false);
@@ -231,6 +283,61 @@ export default function AdminLayout() {
     { text: 'Aprobar Empresas', icon: <ApprovalIcon />, path: '/admin/company-approvals' }
   ];
 
+  // Función para verificar documentos vencidos/próximos a vencer por empresa
+  const checkCompanyDocuments = async (companyId) => {
+    try {
+      const now = new Date();
+      const fiveDaysLater = new Date();
+      fiveDaysLater.setDate(now.getDate() + 5);
+      
+      // Documentos vencidos
+      const expiredQuery = query(
+        collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("status", "==", "Aprobado"),
+        where("expirationDate", "<", now)
+      );
+      
+      // Documentos próximos a vencer (5 días)
+      const soonToExpireQuery = query(
+        collection(db, "uploadedDocuments"),
+        where("companyId", "==", companyId),
+        where("status", "==", "Aprobado"),
+        where("expirationDate", ">", now),
+        where("expirationDate", "<", fiveDaysLater)
+      );
+      
+      const [expiredSnap, soonToExpireSnap] = await Promise.all([
+        getDocs(expiredQuery),
+        getDocs(soonToExpireQuery)
+      ]);
+      
+      return {
+        hasExpired: !expiredSnap.empty,
+        hasSoonToExpire: !soonToExpireSnap.empty
+      };
+    } catch (error) {
+      console.error("Error verificando documentos:", error);
+      return { hasExpired: false, hasSoonToExpire: false };
+    }
+  };
+
+  // Actualizar companies con estado de documentos
+  useEffect(() => {
+    const updateCompaniesWithDocStatus = async () => {
+      if (!companies.length) return;
+      
+      const updatedCompanies = await Promise.all(companies.map(async (company) => {
+        const docStatus = await checkCompanyDocuments(company.id);
+        return { ...company, ...docStatus };
+      }));
+      
+      // Actualizar companies en el contexto si es necesario
+    };
+    
+    updateCompaniesWithDocStatus();
+  }, [companies]);
+
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
@@ -261,7 +368,17 @@ export default function AdminLayout() {
               <MenuItem value="todas"><em>Todas las empresas</em></MenuItem>
               {companies.map((company) => (
                 <MenuItem key={company.id} value={String(company.id)}>
-                  {company.companyName || company.name}
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: '50%', 
+                      mr: 1,
+                      bgcolor: company.hasExpired ? 'error.main' : 
+                               company.hasSoonToExpire ? 'warning.main' : 'transparent'
+                    }} />
+                    {company.companyName || company.name}
+                  </Box>
                 </MenuItem>
               ))}
             </Select>

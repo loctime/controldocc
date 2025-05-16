@@ -14,10 +14,15 @@ export const CompaniesProvider = ({ children }) => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "companies"));
-      const sortedCompanies = [...snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))].sort((a, b) => {
-        if (!a?.name || !b?.name) return 0;
-        return a.name.localeCompare(b.name);
-      });
+      const sortedCompanies = [...snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || data.companyName || "Sin nombre",
+          ...data
+        };
+      })].sort((a, b) => a.name.localeCompare(b.name));
+      
       setCompanies(sortedCompanies);
     } catch (err) {
       setError('Error al cargar empresas');

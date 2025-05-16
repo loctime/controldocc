@@ -50,6 +50,7 @@ export default function AdminDashboard() {
     conFecha: true
   });
   const [selectedCard, setSelectedCard] = useState(null);
+  const [empresasConVencidos, setEmpresasConVencidos] = useState([]);
 
   const navigate = useNavigate();
 
@@ -90,53 +91,83 @@ export default function AdminDashboard() {
     };
 
     fetchStats();
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, companies]);
 
   useEffect(() => {
-    const fetchPreview = async () => {
-      if (!showDetails) {
-        setPreviewDocs([]);
-        return;
-      }
-
-      setLoading(true);
+    const calcularEmpresasConVencidos = async () => {
       const hoy = new Date();
 
       try {
+        const uploadedSnap = await getDocs(collection(db, "uploadedDocuments"));
+
+        const empresasConDocumentosVencidos = new Set();
+
+        uploadedSnap.forEach(doc => {
+          const data = doc.data();
+          const exp = parseFirestoreDate(data.expirationDate);
+          const diasRestantes = exp ? Math.ceil((exp - hoy) / (1000 * 60 * 60 * 24)) : null;
+
+          if (diasRestantes !== null && diasRestantes < 0) {
+            empresasConDocumentosVencidos.add(data.companyId);
+          }
+        });
+
+        const empresasNombres = companies
+          .filter(c => empresasConDocumentosVencidos.has(c.id))
+          .map(c => c.name);
+
+        setEmpresasConVencidos(empresasNombres);
+      } catch (err) {
+        console.error("Error al calcular empresas con vencidos:", err);
+      }
+    };
+
+    if (companies.length > 0) {
+      calcularEmpresasConVencidos();
+    }
+  }, [companies]);
+
+  useEffect(() => {
+    const fetchPreview = async () => {
+      const hoy = new Date();
+      setLoading(true);
+  
+      try {
         const queryConstraints = [];
         if (selectedCompanyId) {
-          queryConstraints.push(where("companyId", "==", selectedCompanyId));
+          queryConstraints.push(where('companyId', '==', selectedCompanyId));
         }
-        if (showDetails !== "TodosDocumentos" && showDetails !== "TodasEmpresas") {
-          queryConstraints.push(where("status", "==", showDetails));
-        }
-
+  
         const uploadedSnap = await getDocs(query(collection(db, "uploadedDocuments"), ...queryConstraints));
-
+  
         const docs = await Promise.all(uploadedSnap.docs.map(async docSnap => {
           const data = docSnap.data();
           const exp = parseFirestoreDate(data.expirationDate);
           const diasRestantes = exp ? Math.ceil((exp - hoy) / (1000 * 60 * 60 * 24)) : null;
-
-          let requiredName = "";
-          if (data.requiredDocumentId) {
-            const ref = doc(db, "requiredDocuments", data.requiredDocumentId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) requiredName = snap.data().name;
-          }
-
+  
+          // Obtener nombre de empresa
+          const companyName = companies.find(c => c.id === data.companyId)?.name || "Sin empresa";
+  
+          // Determinar tipo de entidad visual
+          let categoria = "Sin categoría";
+          if (data.entityType === "employee") categoria = "Personal";
+          else if (data.entityType === "company") categoria = "Empresa";
+          else if (data.entityType === "vehicle") categoria = "Vehículo";
+          else if (data.entityType === "other") categoria = "Otro";
+  
           return {
             id: docSnap.id,
-            companyId: data.companyId,
-            companyName: companies.find(c => c.id === data.companyId)?.name || "Sin nombre",
-            category: requiredName || "Sin categoría",
+            ...data,
             name: data.fileName || "Sin nombre",
             expirationDate: exp,
             diasRestantes,
             status: data.status || "Sin estado",
+            companyName,
+            categoria,
+            companyId: data.companyId
           };
         }));
-
+  
         setPreviewDocs(docs.sort((a, b) => {
           if (a.diasRestantes !== null && b.diasRestantes !== null) return a.diasRestantes - b.diasRestantes;
           if (a.diasRestantes === null) return 1;
@@ -144,18 +175,15 @@ export default function AdminDashboard() {
         }));
       } catch (err) {
         console.error("Error al cargar documentos:", err);
-        setPreviewDocs([]);
       } finally {
         setLoading(false);
       }
     };
-
-    const timer = setTimeout(() => {
-      fetchPreview();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [showDetails, selectedCompanyId, companies]);
+  
+    fetchPreview();
+  }, [selectedCompanyId, showDetails, companies]);
+  
+  
 
   const getDeadlineColor = (diasRestantes) => {
     if (diasRestantes == null) return 'text.primary';
@@ -182,22 +210,21 @@ export default function AdminDashboard() {
       <Grid container spacing={2}>
         <Grid item xs={12} sm={4} md={3}>
           <StatCard
-            title="Empresas"
-            value={companies.length}
-            icon={<BusinessIcon color={companiesStatus === 'success' ? 'success' : 'warning'} />}
-            color={companiesStatus === 'error' ? 'error' : companiesStatus === 'warning' ? 'warning' : 'success'}
+            title="En riesgo"
+            value={empresasConVencidos.length}
+            icon={<BusinessIcon color={empresasConVencidos.length > 0 ? 'error' : 'success'} />}
+            color={empresasConVencidos.length > 0 ? 'error' : 'success'}
             onAction={() => {
               setShowDetails("TodasEmpresas");
               setSelectedCard('empresas');
             }}
             isSelected={selectedCard === 'empresas'}
             warningText={
-              companiesStatus === 'error'
-                ? '⚠ rechazos'
-                : companiesStatus === 'warning'
-                ? '⚠ vencimientos'
-                : '✓ al día'
+              empresasConVencidos.length === 0
+                ? '✓ Todas al día'
+                : null
             }
+            companiesAtRisk={empresasConVencidos}
           />
         </Grid>
         <Grid item xs={12} sm={4} md={3}>

@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 
-export default function StatCard({ title, value, icon, color, onAction, isSelected, warningText }) {
+export default function StatCard({ title, value, icon, color, onAction, isSelected, warningText, companiesAtRisk }) {
   return (
     <Card 
       elevation={isSelected ? 3 : 1} 
@@ -38,7 +38,36 @@ export default function StatCard({ title, value, icon, color, onAction, isSelect
           </Typography>
         </Box>
 
-        {warningText && (
+        {companiesAtRisk && companiesAtRisk.length > 0 ? (
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 1,
+            mb: 1
+          }}>
+            {companiesAtRisk.map((company, index) => (
+              <Box key={index} sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                bgcolor: 'error.light',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1
+              }}>
+                <Box sx={{ 
+                  width: 8, 
+                  height: 8, 
+                  bgcolor: 'error.main',
+                  borderRadius: '50%',
+                  mr: 1
+                }} />
+                <Typography variant="caption" fontWeight="bold">
+                  {company}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        ) : warningText && (
           <Box sx={{
             bgcolor: color === 'error.main' ? 'error.light' : 'warning.light',
             px: 1,

@@ -32,7 +32,14 @@ export default function EmpresasTable({
         </TableHead>
         <TableBody>
           {companies.map((company) => {
-            const docsEmpresa = previewDocs.filter((doc) => doc.companyId === company.id);
+            const docsEmpresa = previewDocs
+              .filter((doc) => doc.companyId === company.id)
+              .sort((a, b) => {
+                if (a.diasRestantes === null && b.diasRestantes === null) return 0;
+                if (a.diasRestantes === null) return 1;
+                if (b.diasRestantes === null) return -1;
+                return a.diasRestantes - b.diasRestantes;
+              });
             const isExpanded = expandedRow === company.id;
 
             const aprobados = docsEmpresa.filter((d) => d.status === "Aprobado").length;
@@ -42,8 +49,8 @@ export default function EmpresasTable({
             return (
               <React.Fragment key={company.id}>
                 <TableRow hover>
-                  <TableCell>{company.name}</TableCell>
-                  <TableCell align="center">
+                <TableCell>{company.name || company.companyName || "Sin nombre"}</TableCell>
+                <TableCell align="center">
                     <Chip label={aprobados} color={aprobados > 0 ? "success" : "default"} size="small" />
                   </TableCell>
                   <TableCell align="center">

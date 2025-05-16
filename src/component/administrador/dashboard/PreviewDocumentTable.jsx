@@ -75,7 +75,7 @@ export default function PreviewDocumentTable({
         {visibleDocs.map((doc) => (
           <Box key={doc.id} sx={{ display: "flex", p: 1, borderTop: "1px solid #eee" }}>
             <Box sx={{ flex: 2 }}>{doc.companyName}</Box>
-            <Box sx={{ flex: 2 }}>{doc.category}</Box>
+            <Box sx={{ flex: 2 }}>{doc.categoria || doc.entityType || "Sin categoría"}</Box>
             <Box sx={{ flex: 2 }}>{doc.name}</Box>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
